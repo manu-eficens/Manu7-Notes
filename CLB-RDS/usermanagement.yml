@@ -1,19 +1,4 @@
-#step5: for classic load balancer & RDS
-
-# 01-MySQL-externalName-Service.yml
-
-apiVersion: v1
-kind: Service
-metadata:
-  name: mysql
-spec:
-  type: ExternalName
-  externalName: database-1.czj7jypmn3wk.us-east-1.rds.amazonaws.com
-
-# connect to mysql
-# kubectl run -it --rm --image=mysql:8.0.33 --restart=Never mysql-client -- mysql -h database-1.czj7jypmn3wk.us-east-1.rds.amazonaws.com -u admin -p
----------------------------------------------------------------
-#02-UserManagementMicroservice-Deployment-Service.yml
+02-UserManagementMicroservice-Deployment-Service.yml
 
 apiVersion: apps/v1
 kind: Deployment 
@@ -67,29 +52,4 @@ spec:
               path: /usermgmt/health-status
               port: 8095
             initialDelaySeconds: 60
-            periodSeconds: 10          
-----------------------------------------------------------------------------------------
-# 03-Kubernetes-Secrets.yml
-
-apiVersion: v1
-kind: Secret
-metadata:
-  name: mysql-db-password
-type: Opaque
-data: 
-  db-password: TWFudTU3MTg=
---------------------------------------------------------------------------------------
-# 04-ClassicLoadBalancer.yml
-apiVersion: v1
-kind: Service
-metadata:
-  name: clb-usermgmt-restapp
-  labels: 
-    app: usermgmt-restapp
-spec:
-  type: LoadBalancer # Default - CLB
-  selector:
-    app: usermgmt-restapp
-  ports: 
-    - port: 80
-      targetPort: 8095
+            periodSeconds: 10

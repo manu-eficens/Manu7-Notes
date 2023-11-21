@@ -1,0 +1,12 @@
+# 01-MySQL-externalName-Service.yml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  type: ExternalName
+  externalName: database-1.czj7jypmn3wk.us-east-1.rds.amazonaws.com
+
+# connect to mysql
+# kubectl run -it --rm --image=mysql:8.0.33 --restart=Never mysql-client -- mysql -h database-1.czj7jypmn3wk.us-east-1.rds.amazonaws.com -u admin -p
