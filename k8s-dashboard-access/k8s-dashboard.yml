@@ -1,4 +1,4 @@
-		
+	
 #Access kubernetes dashboard ( DEPLOY THE OFFICIAL KUBERNETES DASHBOARD )
 # https://archive.eksworkshop.com/beginner/040_dashboard/dashboard/   (Normal approach-- port forwarding )
 # https://upcloud.com/resources/tutorials/deploy-kubernetes-dashboard
