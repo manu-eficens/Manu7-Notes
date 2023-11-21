@@ -1,0 +1,1460 @@
+index:
+
+		Eks tasks 
+
+step1: Prerequesites installations 
+Step2: Create EKS Cluster using eksctl
+Step3: Create & Associate IAM OIDC Provider for our EKS Cluster
+step4: create nodegroup in private subnets
+step5: for classic load balancer & RDS
+step6: for network load balancer & RDS
+step7: AWS Load Balancer Controller Install on AWS EKS And ingress class resource.yml
+step8: ALB Ingress-- context path based routing using application load balancer
+step9: AWS Load Balancer Controller - External DNS Install
+step10: three apps(app1,app2,app3) and ingress file with SSL also
+step11: ALB Ingress-- Name based virtual host or host header routing 
+step12: AWS Load Balancer Controller - Ingress Groups
+step13: create ECR repository and push image to ECR or followpush commands in aws ecr repository push commands 
+step14: EKS - Horizontal Pod Autoscaling (HPA) imperative & declaritive methods 					 document pending
+step15: EKS - vertical Pod Autoscaling (HPA) imperative & declaritive methods 						document pending
+
+
+
+		Monitoring
+step1: cloudwatch container insight with EKS 
+step2: Prometheus and Grafana Dashboard on EKS Cluster using Helm Chart
+
+		CI/CD
+step1: Continuous Delivery with Amazon EKS and ArgoCD									task pending
+https://sunitabachhav2007.hashnode.dev/continuous-delivery-with-amazon-eks-and-argocd
+
+		Github Actions 
+
+
+
+
+		Access kubernetes dashboard
+task1: DEPLOY THE OFFICIAL KUBERNETES DASHBOARD
+	https://archive.eksworkshop.com/beginner/040_dashboard/dashboard/
+        https://upcloud.com/resources/tutorials/deploy-kubernetes-dashboard
+	https://surajblog.medium.com/simplified-deployment-of-kubernetes-dashboard-with-alb-ingress-controller-bf3396c0dc54
+
+		eks workshops
+https://eks-upgrades-workshop.netlify.app/docs/intro
+https://www.youtube.com/watch?v=ebSAb-ERqAM
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+step1: Pre request installations 
+
+1.Install aws cli
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+export PATH=/usr/local/bin:$PATH
+source ~/.bash_profile
+
+aws --version
+-----------------------------------------
+2.Install kubectl
+sudo curl -o /usr/local/bin/kubectl  \
+   https://s3.us-west-2.amazonaws.com/amazon-eks/1.27.4/2023-08-16/bin/linux/amd64/kubectl
+
+sudo chmod +x /usr/local/bin/kubectl
+
+kubectl version --client=true --short=true
+-----------------------------------------
+3.Install eksctl
+curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+sudo mv -v /tmp/eksctl /usr/local/bin
+
+eksctl version
+-------------------------------------------------------------------------------------------------
+
+Step2: Create EKS Cluster using eksctl
+
+eksctl create cluster --name=test-eks \
+                      --region=us-east-1 \
+                      --zones=us-east-1a,us-east-1b \
+                      --without-nodegroup 
+--------------------------------------------------------------------------------------------------------------------------------------------------
+Step3: Create & Associate IAM OIDC Provider for our EKS Cluster
+
+- To enable and use AWS IAM roles for Kubernetes service accounts on our EKS cluster, we must create &  associate OIDC identity provider.
+- To do so using `eksctl` we can use the  below command. 
+- Use latest eksctl version (as on today the latest version is `0.21.0`)                 
+
+# Replace with region & cluster name
+eksctl utils associate-iam-oidc-provider \
+    --region us-east-1 \
+    --cluster test-eks \
+    --approve
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+step4: create nodegroup in private subnets
+
+eksctl create nodegroup --cluster=test-eks \
+                        --region=us-east-1 \
+                        --name=test-eks-private57 \
+                        --node-type=t3.medium \
+                        --nodes=2 \
+                        --nodes-min=1 \
+                        --nodes-max=4 \
+                        --node-volume-size=20 \
+                        --ssh-access \
+                        --ssh-public-key=autoscaling-key \
+                        --managed \
+                        --asg-access \
+                        --external-dns-access \
+                        --full-ecr-access \
+                        --appmesh-access \
+                        --alb-ingress-access \
+                        --node-private-networking 
+			
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+
+step5: for classic load balancer & RDS
+
+01-MySQL-externalName-Service.yml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  type: ExternalName
+  externalName: database-1.czj7jypmn3wk.us-east-1.rds.amazonaws.com
+
+# connect to mysql
+# kubectl run -it --rm --image=mysql:8.0.33 --restart=Never mysql-client -- mysql -h database-1.czj7jypmn3wk.us-east-1.rds.amazonaws.com -u admin -p
+---------------------------------------------------------------------------
+02-UserManagementMicroservice-Deployment-Service.yml
+
+apiVersion: apps/v1
+kind: Deployment 
+metadata:
+  name: usermgmt-microservice
+  labels:
+    app: usermgmt-restapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: usermgmt-restapp
+  template:  
+    metadata:
+      labels: 
+        app: usermgmt-restapp
+    spec:
+      initContainers:
+        - name: init-db
+          image: busybox:1.31
+          command: ['sh', '-c', 'echo -e "Checking for the availability of MySQL Server deployment"; while ! nc -z mysql 3306; do sleep 1; printf "-"; done; echo -e "  >> MySQL DB Server has started";']      
+      containers:
+        - name: usermgmt-restapp
+          image: stacksimplify/kube-usermanagement-microservice:1.0.0  
+          ports: 
+            - containerPort: 8095           
+          env:
+            - name: DB_HOSTNAME
+              value: "mysql"            
+            - name: DB_PORT
+              value: "3306"            
+            - name: DB_NAME
+              value: "usermgmt"            
+            - name: DB_USERNAME
+              value: "admin"        # RDS DB Username is admin     
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-db-password
+                  key: db-password           
+          livenessProbe:
+            exec:
+              command: 
+                - /bin/sh
+                - -c 
+                - nc -z localhost 8095
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /usermgmt/health-status
+              port: 8095
+            initialDelaySeconds: 60
+            periodSeconds: 10          
+----------------------------------------------------------------------------------------
+03-Kubernetes-Secrets.yml
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-db-password
+type: Opaque
+data: 
+  db-password: TWFudTU3MTg=
+--------------------------------------------------------------------------------------
+04-ClassicLoadBalancer.yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: clb-usermgmt-restapp
+  labels: 
+    app: usermgmt-restapp
+spec:
+  type: LoadBalancer # Default - CLB
+  selector:
+    app: usermgmt-restapp
+  ports: 
+    - port: 80
+      targetPort: 8095
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+step6: for network load balancer & RDS
+
+01-MySQL-externalName-Service.yml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  type: ExternalName
+  externalName: database-1.czj7jypmn3wk.us-east-1.rds.amazonaws.com
+---------------------------------------------------------------------------
+02-UserManagementMicroservice-Deployment-Service.yml
+
+apiVersion: apps/v1
+kind: Deployment 
+metadata:
+  name: usermgmt-microservice
+  labels:
+    app: usermgmt-restapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: usermgmt-restapp
+  template:  
+    metadata:
+      labels: 
+        app: usermgmt-restapp
+    spec:
+      initContainers:
+        - name: init-db
+          image: busybox:1.31
+          command: ['sh', '-c', 'echo -e "Checking for the availability of MySQL Server deployment"; while ! nc -z mysql 3306; do sleep 1; printf "-"; done; echo -e "  >> MySQL DB Server has started";']      
+      containers:
+        - name: usermgmt-restapp
+          image: stacksimplify/kube-usermanagement-microservice:1.0.0  
+          ports: 
+            - containerPort: 8095           
+          env:
+            - name: DB_HOSTNAME
+              value: "mysql"            
+            - name: DB_PORT
+              value: "3306"            
+            - name: DB_NAME
+              value: "usermgmt"            
+            - name: DB_USERNAME
+              value: "admin"        # RDS DB Username is admin     
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-db-password
+                  key: db-password           
+          livenessProbe:
+            exec:
+              command: 
+                - /bin/sh
+                - -c 
+                - nc -z localhost 8095
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /usermgmt/health-status
+              port: 8095
+            initialDelaySeconds: 60
+            periodSeconds: 10          
+----------------------------------------------------------------------------------------
+03-Kubernetes-Secrets.yml
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-db-password
+type: Opaque
+data: 
+  db-password: TWFudTU3MTg=
+------------------------------------------------------------------------------------
+04-Network load balancer.yml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nlb-usermgmt-restapp
+  labels: 
+    app: usermgmt-restapp
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb    # To create Network Load Balancer
+spec:
+  type: LoadBalancer # Default - CLB
+  selector:
+    app: usermgmt-restapp
+  ports: 
+    - port: 80
+      targetPort: 8095
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+step7: AWS Load Balancer Controller Install on AWS EKS
+
+Requirements:
+1. Create IAM Policy and make a note of Policy ARN
+2. Create IAM Role and k8s Service Account and bound them together
+3. Install AWS Load Balancer Controller using HELM3 CLI
+4. Understand IngressClass Concept and create a default Ingress Class
+ 
+# 7a. Download IAM Policy
+## Download latest
+curl -o iam_policy_latest.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/main/docs/install/iam_policy.json
+
+# 7b. Create IAM Policy using policy downloaded 
+aws iam create-policy \
+    --policy-name AWSLoadBalancerControllerIAMPolicy \
+    --policy-document file://iam_policy_latest.json
+
+# 7c. Replaced name, cluster and policy arn (Policy arn we took note in step-02)
+eksctl create iamserviceaccount \
+  --cluster=eks-demo57 \
+  --namespace=kube-system \
+  --name=aws-load-balancer-controller \
+  --attach-policy-arn=arn:aws:iam::238393102293:policy/AWSLoadBalancerControllerIAMPolicy \
+  --override-existing-serviceaccounts \
+  --approve
+# Get IAM Service Account
+eksctl  get iamserviceaccount --cluster eksdemo1
+
+## 7d. Install the AWS Load Balancer Controller using Helm V3 
+ Install Helm
+- [Install Helm](https://helm.sh/docs/intro/install/) if not installed
+- [Install Helm for AWS EKS](https://docs.aws.amazon.com/eks/latest/userguide/helm.html)
+
+# 7e. If you're using Linux, install the binaries with the following commands.
+curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 > get_helm.sh
+chmod 700 get_helm.sh
+./get_helm.sh
+
+# 7f. Add the eks-charts repository.
+helm repo add eks https://aws.github.io/eks-charts
+
+# 7g.  Update your local repo to make sure that you have the most recent charts.
+helm repo update
+
+## 7h.  Replace Cluster Name, Region Code, VPC ID, Image Repo Account ID and Region Code
+
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=eks-demo57 \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller \
+  --set region=us-east-1 \
+  --set vpcId=vpc-018291e888014844a \
+  --set image.repository=602401143452.dkr.ecr.us-east-1.amazonaws.com/amazon/aws-load-balancer-controller
+
+
+# Verify that the controller is installed.
+kubectl -n kube-system get deployment 
+kubectl -n kube-system get deployment aws-load-balancer-controller
+kubectl -n kube-system describe deployment aws-load-balancer-controller
+
+# Verify AWS Load Balancer Controller Webhook service created
+kubectl -n kube-system get svc 
+kubectl -n kube-system get svc aws-load-balancer-webhook-service
+kubectl -n kube-system describe svc aws-load-balancer-webhook-service
+
+# Review logs for AWS LB Controller POD-1
+kubectl -n kube-system logs -f <POD-NAME> 
+kubectl -n kube-system logs -f  aws-load-balancer-controller-86b598cbd6-5pjfk 
+
+## 7i ingressclassresource.yml
+
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: my-aws-ingress-class
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+spec:
+  controller: ingress.k8s.aws/alb
+
+# verify ingress class
+#kubectl get ingressclass
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+step8: ALB Ingress-- context path based routing using application load balancer 
+
+8a. create deployment & service yaml files 
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1-nginx-deployment
+  labels:
+    app: app1-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app1-nginx
+  template:
+    metadata:
+      labels:
+        app: app1-nginx
+    spec:
+      containers:
+        - name: app1-nginx
+          image: stacksimplify/kube-nginxapp1:1.0.0
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app1-nginx-nodeport-service
+  labels:
+    app: app1-nginx
+  annotations:
+#Important Note:  Need to add health check path annotations in service level if we are planning to use multiple targets in a load balancer    
+#    alb.ingress.kubernetes.io/healthcheck-path: /app1/index.html
+spec:
+  type: NodePort
+  selector:
+    app: app1-nginx
+  ports:
+    - port: 80
+      targetPort: 80
+-------------------------------------------------------------
+8b. create ingress rules yaml file 
+
+# Annotations Reference: https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/ingress/annotations/
+# Annotations Reference: https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/ingress/annotations/
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-nginxapp1
+  labels:
+    app: app1-nginx
+  annotations:
+    # Load Balancer Name
+    alb.ingress.kubernetes.io/load-balancer-name: app1ingressrules
+    #kubernetes.io/ingress.class: "alb" (OLD INGRESS CLASS NOTATION - STILL WORKS BUT RECOMMENDED TO USE IngressClass Resource)
+    # Ingress Core Settings
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # Health Check Settings
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP 
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/healthcheck-path: /app1/index.html    
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/success-codes: '200'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+spec:
+  ingressClassName: my-aws-ingress-class # Ingress Class
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: app1-nginx-nodeport-service
+            port:
+              number: 80  
+      
+# 1. If  "spec.ingressClassName: my-aws-ingress-class" not specified, will reference default ingress class on this kubernetes cluster
+# 2. Default Ingress class is nothing but for which ingress class we have the annotation `ingressclass.kubernetes.io/is-default-class: "true"`
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+step9: AWS Load Balancer Controller - External DNS Install
+
+## 9a: Introduction
+- **External DNS:** Used for Updating Route53 RecordSets from Kubernetes 
+- We need to create IAM Policy, k8s Service Account & IAM Role and associate them together for external-dns pod to add or remove entries in AWS Route53 Hosted Zones. 
+- Update External-DNS default manifest to support our needs
+- Deploy & Verify logs
+
+## 9b: Create IAM Policy
+- This IAM policy will allow external-dns pod to add, remove DNS entries (Record Sets in a Hosted Zone) in AWS Route53 service
+- Go to Services -> IAM -> Policies -> Create Policy
+  - Click on **JSON** Tab and copy paste below JSON
+  - Click on **Visual editor** tab to validate
+  - Click on **Review Policy**
+  - **Name:** AllowExternalDNSUpdates 
+  - **Description:** Allow access to Route53 Resources for ExternalDNS
+  - Click on **Create Policy**  
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "route53:ChangeResourceRecordSets"
+      ],
+      "Resource": [
+        "arn:aws:route53:::hostedzone/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "route53:ListHostedZones",
+        "route53:ListResourceRecordSets"
+      ],
+      "Resource": [
+        "*"
+      ]
+    }
+  ]
+}
+
+## 9c
+eksctl create iamserviceaccount \
+    --name external-dns \
+    --namespace default \
+    --cluster eks-demo57 \
+    --attach-policy-arn arn:aws:iam::238393102293:policy/AllowExternalDNSUpdates \
+    --approve \
+    --override-existing-serviceaccounts
+
+------------------
+## 9d deploy extrnaldns.yml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-dns
+  # If you're using Amazon EKS with IAM Roles for Service Accounts, specify the following annotation.
+  # Otherwise, you may safely omit it.
+  annotations:
+    # Substitute your account ID and IAM service role name below. #Change-1: Replace with your IAM ARN Role for extern-dns
+    eks.amazonaws.com/role-arn: arn:aws:iam::238393102293:role/eksctl-eks-demo57-addon-iamserviceaccount-def-Role1-IHelhDKGul8I
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: external-dns
+rules:
+- apiGroups: [""]
+  resources: ["services","endpoints","pods"]
+  verbs: ["get","watch","list"]
+- apiGroups: ["extensions","networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get","watch","list"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["list","watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: external-dns-viewer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: external-dns
+subjects:
+- kind: ServiceAccount
+  name: external-dns
+  namespace: default
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-dns
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: external-dns
+  template:
+    metadata:
+      labels:
+        app: external-dns
+      # If you're using kiam or kube2iam, specify the following annotation.
+      # Otherwise, you may safely omit it.  #Change-2: Commented line 55 and 56
+      #annotations:  
+        #iam.amazonaws.com/role: arn:aws:iam::ACCOUNT-ID:role/IAM-SERVICE-ROLE-NAME    
+    spec:
+      serviceAccountName: external-dns
+      containers:
+      - name: external-dns
+        image: k8s.gcr.io/external-dns/external-dns:v0.10.2
+        args:
+        - --source=service
+        - --source=ingress
+        # Change-3: Commented line 65 and 67 - --domain-filter=external-dns-test.my-org.com # will make ExternalDNS see only the hosted zones matching provided domain, omit to process all available hosted zones
+        - --provider=aws
+       # Change-3: Commented line 65 and 67  - --policy=upsert-only # would prevent ExternalDNS from deleting any records, omit to enable full synchronization
+        - --aws-zone-type=public # only look at public hosted zones (valid values are public, private or no value for both)
+        - --registry=txt
+        - --txt-owner-id=my-hostedzone-identifier
+      securityContext:
+        fsGroup: 65534 # For ExternalDNS to be able to read Kubernetes and AWS token files
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+step10: three apps(app1,app2,app3) and ingress file with SSL and Extenal DNS also
+
+
+app1.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1-nginx-deployment
+  labels:
+    app: app1-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app1-nginx
+  template:
+    metadata:
+      labels:
+        app: app1-nginx
+    spec:
+      containers:
+        - name: app1-nginx
+          image: stacksimplify/kube-nginxapp1:1.0.0
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app1-nginx-nodeport-service
+  labels:
+    app: app1-nginx
+  annotations:
+#Important Note:  Need to add health check path annotations in service level if we are planning to use multiple targets in a load balancer    
+    alb.ingress.kubernetes.io/healthcheck-path: /app1/index.html
+spec:
+  type: NodePort
+  selector:
+    app: app1-nginx
+  ports:
+    - port: 80
+      targetPort: 80
+--------------------------------------------------------
+app2.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app2-nginx-deployment
+  labels:
+    app: app2-nginx 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app2-nginx
+  template:
+    metadata:
+      labels:
+        app: app2-nginx
+    spec:
+      containers:
+        - name: app2-nginx
+          image: stacksimplify/kube-nginxapp2:1.0.0
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app2-nginx-nodeport-service
+  labels:
+    app: app2-nginx
+  annotations:
+#Important Note:  Need to add health check path annotations in service level if we are planning to use multiple targets in a load balancer
+    alb.ingress.kubernetes.io/healthcheck-path: /app2/index.html
+spec:
+  type: NodePort
+  selector:
+    app: app2-nginx
+  ports:
+    - port: 80
+      targetPort: 80
+-------------------------------
+app3.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app3-nginx-deployment
+  labels:
+    app: app3-nginx 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app3-nginx
+  template:
+    metadata:
+      labels:
+        app: app3-nginx
+    spec:
+      containers:
+        - name: app3-nginx
+          image: stacksimplify/kubenginx:1.0.0
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app3-nginx-nodeport-service
+  labels:
+    app: app3-nginx
+  annotations:
+#Important Note:  Need to add health check path annotations in service level if we are planning to use multiple targets in a load balancer
+    alb.ingress.kubernetes.io/healthcheck-path: /index.html
+spec:
+  type: NodePort
+  selector:
+    app: app3-nginx
+  ports:
+    - port: 80
+      targetPort: 80
+-----------------------------------
+ingress.yml  (this file inludes annotations with all and ssl & ssl redirect also)
+
+# Annotations Reference: https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/ingress/annotations/
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-cpr-demo
+  annotations:
+    # Load Balancer Name
+    alb.ingress.kubernetes.io/load-balancer-name: cpr-ingress
+    # Ingress Core Settings
+    #kubernetes.io/ingress.class: "alb" (OLD INGRESS CLASS NOTATION - STILL WORKS BUT RECOMMENDED TO USE IngressClass Resource)
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # Health Check Settings
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP 
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    #Important Note:  Need to add health check path annotations in service level if we are planning to use multiple targets in a load balancer    
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/success-codes: '200'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'   
+    # ssl certificate 
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:238393102293:certificate/3c01123f-6dd0-4661-b3a6-1a68f681e297
+    # ssl redirect
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    # create external dns for creating record-set
+    external-dns.alpha.kubernetes.io/hostname: manuapp1.eficensittest.com, manuapp2.eficensittest.com # give your domain name here
+
+spec:
+  ingressClassName: my-aws-ingress-class   # Ingress Class                       
+  rules:
+    - http:
+        paths:           
+          - path: /app1
+            pathType: Prefix
+            backend:
+              service:
+                name: app1-nginx-nodeport-service
+                port: 
+                  number: 80
+          - path: /app2
+            pathType: Prefix
+            backend:
+              service:
+                name: app2-nginx-nodeport-service
+                port: 
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app3-nginx-nodeport-service
+                port: 
+                  number: 80                     
+             
+
+# Important Note-1: In path based routing order is very important, if we are going to use  "/*" (Root Context), try to use it at the end of all rules.                                        
+                        
+# 1. If  "spec.ingressClassName: my-aws-ingress-class" not specified, will reference default ingress class on this kubernetes cluster
+# 2. Default Ingress class is nothing but for which ingress class we have the annotation `ingressclass.kubernetes.io/is-default-class: "true"`
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+step11: ALB Ingress-- Name based virtual host or host header routing 
+
+here app1.yml, app2.yml, app3.yml same as above the only difference is ingress.yml
+
+ingress.yml  (this file inludes annotations with all and ssl & ssl redirect also)
+
+# Annotations Reference: https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/ingress/annotations/
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-cpr-demo
+  annotations:
+    # Load Balancer Name
+    alb.ingress.kubernetes.io/load-balancer-name: cpr-ingress
+    # Ingress Core Settings
+    #kubernetes.io/ingress.class: "alb" (OLD INGRESS CLASS NOTATION - STILL WORKS BUT RECOMMENDED TO USE IngressClass Resource)
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # Health Check Settings
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP 
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    #Important Note:  Need to add health check path annotations in service level if we are planning to use multiple targets in a load balancer    
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/success-codes: '200'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'   
+    # ssl certificate 
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:238393102293:certificate/3c01123f-6dd0-4661-b3a6-1a68f681e297
+    # ssl redirect
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+     # External DNS - For creating a Record Set in Route53
+    external-dns.alpha.kubernetes.io/hostname: default101.stacksimplify.com 
+spec:
+  ingressClassName: my-aws-ingress-class   # Ingress Class                  
+  defaultBackend:
+    service:
+      name: app3-nginx-nodeport-service
+      port:
+        number: 80     
+  rules:
+    - host: app101.stacksimplify.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app1-nginx-nodeport-service
+                port: 
+                  number: 80
+    - host: app201.stacksimplify.com
+      http:
+        paths:                  
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app2-nginx-nodeport-service
+                port: 
+                  number: 80
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+step12: AWS Load Balancer Controller - Ingress Groups
+
+12a
+
+app1.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1-nginx-deployment
+  labels:
+    app: app1-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app1-nginx
+  template:
+    metadata:
+      labels:
+        app: app1-nginx
+    spec:
+      containers:
+        - name: app1-nginx
+          image: stacksimplify/kube-nginxapp1:1.0.0
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app1-nginx-nodeport-service
+  labels:
+    app: app1-nginx
+  annotations:
+#Important Note:  Need to add health check path annotations in service level if we are planning to use multiple targets in a load balancer    
+    alb.ingress.kubernetes.io/healthcheck-path: /app1/index.html
+spec:
+  type: NodePort
+  selector:
+    app: app1-nginx
+  ports:
+    - port: 80
+      targetPort: 80
+--------------------------------------------
+app1-ingress.yml
+
+# Annotations Reference: https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/ingress/annotations/
+#apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app1-ingress
+  annotations:
+    # Load Balancer Name
+    alb.ingress.kubernetes.io/load-balancer-name: ingress-groups-demo
+    # Ingress Core Settings  
+    #kubernetes.io/ingress.class: "alb" (OLD INGRESS CLASS NOTATION - STILL WORKS BUT RECOMMENDED TO USE IngressClass Resource)
+    alb.ingress.kubernetes.io/scheme: internet-facing    
+    # Health Check Settings
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP 
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    #Important Note:  Need to add health check path annotations in service level if we are planning to use multiple targets in a load balancer    
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/success-codes: '200'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+    ## SSL Settings
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}, {"HTTP":80}]'
+    alb.ingress.kubernetes.io/certificate-arn:  arn:aws:acm:us-east-1:238393102293:certificate/3c01123f-6dd0-4661-b3a6-1a68f681e297
+    #alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-1-2017-01 #Optional (Picks default if not used)    
+    # SSL Redirect Setting
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    # External DNS - For creating a Record Set in Route53
+    external-dns.alpha.kubernetes.io/hostname: manuingress.eficensittest.com 
+    # Ingress Groups
+    alb.ingress.kubernetes.io/group.name: myapps.web
+    alb.ingress.kubernetes.io/group.order: '10'
+spec:
+  ingressClassName: my-aws-ingress-class   # Ingress Class
+  rules:  
+    - http:
+        paths:
+          - path: /app1
+            pathType: Prefix
+            backend:
+              service:
+                name: app1-nginx-nodeport-service
+                port: 
+                  number: 80
+
+
+------------------------------
+12b
+
+app2.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app2-nginx-deployment
+  labels:
+    app: app2-nginx 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app2-nginx
+  template:
+    metadata:
+      labels:
+        app: app2-nginx
+    spec:
+      containers:
+        - name: app2-nginx
+          image: stacksimplify/kube-nginxapp2:1.0.0
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app2-nginx-nodeport-service
+  labels:
+    app: app2-nginx
+  annotations:
+#Important Note:  Need to add health check path annotations in service level if we are planning to use multiple targets in a load balancer
+    alb.ingress.kubernetes.io/healthcheck-path: /app2/index.html
+spec:
+  type: NodePort
+  selector:
+    app: app2-nginx
+  ports:
+    - port: 80
+      targetPort: 80
+
+   ----------------
+app2-ingress.yml
+
+# Annotations Reference: https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/ingress/annotations/
+#apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app2-ingress
+  annotations:
+    # Ingress Core Settings  
+    #kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # Load Balancer Name
+    alb.ingress.kubernetes.io/load-balancer-name: ingress-groups-demo
+    # Health Check Settings
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP 
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    #Important Note:  Need to add health check path annotations in service level if we are planning to use multiple targets in a load balancer    
+    #alb.ingress.kubernetes.io/healthcheck-path: /usermgmt/health-status
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/success-codes: '200'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+    ## SSL Settings
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}, {"HTTP":80}]'
+    alb.ingress.kubernetes.io/certificate-arn:  arn:aws:acm:us-east-1:238393102293:certificate/3c01123f-6dd0-4661-b3a6-1a68f681e297
+    #alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-1-2017-01 #Optional (Picks default if not used)    
+    # SSL Redirect Setting
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    # External DNS - For creating a Record Set in Route53
+    external-dns.alpha.kubernetes.io/hostname: manuingress.eficensittest.com 
+    # Ingress Groups
+    alb.ingress.kubernetes.io/group.name: myapps.web
+    alb.ingress.kubernetes.io/group.order: '20'
+spec:
+  ingressClassName: my-aws-ingress-class   # Ingress Class
+  rules:  
+    - http:
+        paths:
+          - path: /app2
+            pathType: Prefix
+            backend:
+              service:
+                name: app2-nginx-nodeport-service
+                port: 
+                  number: 80
+
+
+------------------------------------------
+
+12c 
+
+app3.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app3-nginx-deployment
+  labels:
+    app: app3-nginx 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app3-nginx
+  template:
+    metadata:
+      labels:
+        app: app3-nginx
+    spec:
+      containers:
+        - name: app2-nginx
+          image: stacksimplify/kubenginx:1.0.0
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app3-nginx-nodeport-service
+  labels:
+    app: app3-nginx
+  annotations:
+#Important Note:  Need to add health check path annotations in service level if we are planning to use multiple targets in a load balancer
+    alb.ingress.kubernetes.io/healthcheck-path: /index.html
+spec:
+  type: NodePort
+  selector:
+    app: app3-nginx
+  ports:
+    - port: 80
+      targetPort: 80
+----------------
+app3-ingress.yml
+
+# Annotations Reference: https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/ingress/annotations/
+#apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app3-ingress
+  annotations:
+    # Ingress Core Settings  
+    #kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # Load Balancer Name
+    alb.ingress.kubernetes.io/load-balancer-name: ingress-groups-demo
+    # Health Check Settings
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP 
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    #Important Note:  Need to add health check path annotations in service level if we are planning to use multiple targets in a load balancer    
+    #alb.ingress.kubernetes.io/healthcheck-path: /usermgmt/health-status
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/success-codes: '200'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+    ## SSL Settings
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}, {"HTTP":80}]'
+    alb.ingress.kubernetes.io/certificate-arn:  arn:aws:acm:us-east-1:238393102293:certificate/3c01123f-6dd0-4661-b3a6-1a68f681e297
+    #alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-1-2017-01 #Optional (Picks default if not used)    
+    # SSL Redirect Setting
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    # External DNS - For creating a Record Set in Route53
+    external-dns.alpha.kubernetes.io/hostname: manuingress.eficensittest.com 
+    
+    
+    # Ingress Groups
+    alb.ingress.kubernetes.io/group.name: myapps.web
+    alb.ingress.kubernetes.io/group.order: '30'
+spec:
+  ingressClassName: my-aws-ingress-class   # Ingress Class
+  defaultBackend:
+    service:
+      name: app3-nginx-nodeport-service
+      port:
+        number: 80    
+
+------------------------------------------------------------------------------------------------------------------------------------------
+step13: create ECR repository and push image to ECR or followpush commands in aws ecr repository push commands 
+
+13a. Create ECR Repository
+- Create simple ECR repository via AWS Console 
+   - Repository Name: aws-ecr-kubenginx
+   - Tag Immutability: Enable
+   - Scan on Push: Enable
+
+13b. # Build Docker Image
+docker build -t <ECR-REPOSITORY-URI>:<TAG> . 
+docker build -t 238393102293.dkr.ecr.us-east-1.amazonaws.com/aws-ecr-kubenginx:1.0.0 . 
+
+# Run Docker Image locally & Test
+docker run --name <name-of-container> -p 80:80 --rm -d <ECR-REPOSITORY-URI>:<TAG>
+docker run --name aws-ecr-kubenginx -p 80:80 --rm -d 238393102293.dkr.ecr.us-east-1.amazonaws.com/aws-ecr-kubenginx:1.0.0
+
+# Access Application locally
+http://localhost
+
+# Stop Docker Container
+docker ps
+docker stop aws-ecr-kubenginx
+docker ps -a -q
+
+# Get Login Password
+aws ecr get-login-password --region <your-region> | docker login --username AWS --password-stdin <ECR-REPOSITORY-URI>
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 238393102293.dkr.ecr.us-east-1.amazonaws.com/aws-ecr-kubenginx
+
+# Push the Docker Image
+docker push <ECR-REPOSITORY-URI>:<TAG>
+docker push 238393102293.dkr.ecr.us-east-1.amazonaws.com/aws-ecr-kubenginx:1.0.0
+----------------------------------------------------------------------------------------------------------------------------------------
+step14: EKS - Horizontal Pod Autoscaling (HPA) imperative & declaritive methods 
+
+imperative method:
+14a 
+# Verify if Metrics Server already Installed
+kubectl -n kube-system get deployment/metrics-server
+
+# Install Metrics Server
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.6.3/components.yaml
+
+# Verify
+kubectl get deployment metrics-server -n kube-system
+------------------------
+14b
+hpa-demo.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hpa-demo-deployment
+  labels:
+    app: hpa-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hpa-nginx
+  template:
+    metadata:
+      labels:
+        app: hpa-nginx
+    spec:
+      containers:
+      - name: hpa-nginx
+        image: stacksimplify/kubenginx:1.0.0
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "500Mi"
+            cpu: "200m"          
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hpa-demo-service-nginx
+  labels:
+    app: hpa-nginx
+spec:
+  type: NodePort
+  selector:
+    app: hpa-nginx
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 31231
+   -------------------------------
+14c
+# Deploy
+kubectl apply -f kube-manifests/
+
+# List Pods, Deploy & Service
+kubectl get pod,svc,deploy
+ 
+14d
+# template
+kubectl autoscale deployment hpa-demo-deployment --cpu-percent=50 --min=1 --max=10
+
+# Describe HPA
+kubectl describe hpa/hpa-demo-deployment 
+
+# List HPA
+kubectl get horizontalpodautoscaler.autoscaling/hpa-demo-deployment  
+
+14e
+ Create the load & Verify how HPA is working
+# Generate Load
+kubectl run apache-bench --image=httpd --restart=Never -- /bin/sh -c "ab -n 500000 -c 1000 http://hpa-demo-service-nginx.default.svc.cluster.local/"
+
+# List all HPA
+kubectl get hpa
+
+# List specific HPA
+kubectl get hpa hpa-demo-deployment 
+
+# Describe HPA
+kubectl describe hpa/hpa-demo-deployment 
+
+# List Pods
+kubectl get pods  
+
+----------------------------------------------
+14f declarative method  ( pending )
+
+
+
+-------------------------------------------------------------------------------------------------------------------------------
+step15: EKS - vertical Pod Autoscaling (HPA) imperative & declaritive methods
+
+------------------------------------------------------------------------------------------------------------------------------------------
+			monitoring 
+
+step1: cloudwatch container insight with EKS
+
+1a
+ # Verify if Metrics Server already Installed
+kubectl -n kube-system get deployment/metrics-server
+
+# Install Metrics Server
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.6.3/components.yaml
+
+# Verify
+kubectl get deployment metrics-server -n kube-system
+
+1b 
+
+------------------------------------------------------------------------------------------------------------
+step2: Prometheus and Grafana Dashboard on EKS Cluster using Helm Chart ( refer below website )
+https://sunitabachhav2007.hashnode.dev/prometheus-and-grafana-dashboard-on-eks-cluster-using-helm-chart
+https://archive.eksworkshop.com/intermediate/240_monitoring/
+
+
+
+--------------------------------------------------------------------------------------------------------
+
+			CI/CD
+
+step1: Continuous Delivery with Amazon EKS and ArgoCD
+https://sunitabachhav2007.hashnode.dev/continuous-delivery-with-amazon-eks-and-argocd
+
+
+-------------------------------------------------------------------------------------------------------
+
+			Access kubernetes dashboard
+DEPLOY THE OFFICIAL KUBERNETES DASHBOARD
+https://archive.eksworkshop.com/beginner/040_dashboard/dashboard/
+
+
+ token    glc_eyJvIjoiOTA1NjMxIiwibiI6Im15IiwiayI6Imk0ZnpxMGFJRFcxaHgwMmN6ODUwNTZnaCIsIm0iOnsiciI6InByb2QtdXMtZWFzdC0wIn19
+
+
+helm repo add grafana https://grafana.github.io/helm-charts &&
+  helm repo update &&
+  helm upgrade --install grafana-k8s-monitoring grafana/k8s-monitoring \
+    --namespace "default" --create-namespace --values - <<EOF
+cluster:
+  name: eks-demo57
+externalServices:
+  prometheus:
+    host: https://prometheus-prod-13-prod-us-east-0.grafana.net
+    basicAuth:
+      username: "1103224"
+      password: glc_eyJvIjoiOTA1NjMxIiwibiI6Im15IiwiayI6Imk0ZnpxMGFJRFcxaHgwMmN6ODUwNTZnaCIsIm0iOnsiciI6InByb2QtdXMtZWFzdC0wIn19
+  loki:
+    host: https://logs-prod-006.grafana.net
+    basicAuth:
+      username: "651436"
+      password: glc_eyJvIjoiOTA1NjMxIiwibiI6Im15IiwiayI6Imk0ZnpxMGFJRFcxaHgwMmN6ODUwNTZnaCIsIm0iOnsiciI6InByb2QtdXMtZWFzdC0wIn19
+opencost:
+  opencost:
+    exporter:
+      defaultClusterId: eks-demo57
+    prometheus:
+      external:
+        url: https://prometheus-prod-13-prod-us-east-0.grafana.net/api/prom
+EOF
+
+http://prometheus-server.prometheus.svc.cluster.local
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: grafana
+  labels:
+    app: grafana
+spec:
+  selector:
+    app: grafana
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3000
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: grafana
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /login
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+spec:
+  rules:
+  - host: manugrafana.eficensittest.com
+    http:
+      paths:
+      - path: /*
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 80
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: grafana
+data:
+  datasources.yaml: |-
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      type: prometheus
+      url: http://prometheus-server.prometheus.svc.cluster.local
+      access: proxy
+      isDefault: true
+
+
+helm install grafana grafana/grafana \
+    --namespace grafana \
+    --set persistence.storageClassName="gp2" \
+    --set persistence.enabled=true \
+    --set adminPassword='Manu@5718' \
+    --values ${HOME}/environment/grafana/grafana1.yml \
+    --set service.type=ClusterIP
+
+
+aws eks get-token --cluster-name eks-demo57 | jq -r '.status.token'
+
+
+k8s dash board 
+
+https://surajblog.medium.com/simplified-deployment-of-kubernetes-dashboard-with-alb-ingress-controller-bf3396c0dc54
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+    alb.ingress.kubernetes.io/backend-protocol: HTTPS
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:238393102293:certificate/3c01123f-6dd0-4661-b3a6-1a68f681e297
+    alb.ingress.kubernetes.io/group.name: myapplication.web
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "4"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/load-balancer-name: k8s-dashboard
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/success-codes: "200"
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    external-dns.alpha.kubernetes.io/hostname: k8sdashboard.eficensittest.com
+  name: my-ingress
+  namespace: kubernetes-dashboard
+spec:
+  ingressClassName: my-aws-ingress-class
+  rules:
+    - host: k8sdashboard.eficensittest.com
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: kubernetes-dashboard
+              port:
+                number: 443
+
+
+
+
+
