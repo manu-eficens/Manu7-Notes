@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+	
+>>>>>>> 6d1d721fb77ad1cff38b8249d3845d10440bb5f3
 #Access kubernetes dashboard ( DEPLOY THE OFFICIAL KUBERNETES DASHBOARD )
 # https://archive.eksworkshop.com/beginner/040_dashboard/dashboard/   (Normal approach-- port forwarding )
 # https://upcloud.com/resources/tutorials/deploy-kubernetes-dashboard
