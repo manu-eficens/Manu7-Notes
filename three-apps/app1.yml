@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1-nginx-deployment
+  labels:
+    namespace: manu
+    app: app1-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app1-nginx
+  template:
+    metadata:
+      labels:
+        app: app1-nginx
+    spec:
+      containers:
+        - name: app1-nginx
+          image: stacksimplify/kube-nginxapp1:1.0.0
+          ports:
+            - containerPort: 80
+          resources:
+            limits:
+              cpu: "0.5"
+              memory: "512Mi"
+            requests:
+              cpu: "0.2"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /app1/index.html
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /app1/index.html
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          env:
+
+          - name: project_env
+            value: development
+          - name: project_name
+            value: demo-app1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app1-nginx-nodeport-service
+  labels:
+    app: app1-nginx
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: /app1/index.html
+spec:
+  type: NodePort
+  selector:
+    app: app1-nginx
+  ports:
+    - port: 80
+      targetPort: 80
