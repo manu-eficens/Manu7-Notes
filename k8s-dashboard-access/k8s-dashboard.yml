@@ -5,6 +5,7 @@
 #Access kubernetes dashboard ( DEPLOY THE OFFICIAL KUBERNETES DASHBOARD )
 # https://archive.eksworkshop.com/beginner/040_dashboard/dashboard/   (Normal approach-- port forwarding )
 # https://upcloud.com/resources/tutorials/deploy-kubernetes-dashboard
+# https://surajblog.medium.com/simplified-deployment-of-kubernetes-dashboard-with-alb-ingress-controller-bf3396c0dc54
 
 
 # https://surajblog.medium.com/simplified-deployment-of-kubernetes-dashboard-with-alb-ingress-controller-bf3396c0dc54 (ALB approach)
