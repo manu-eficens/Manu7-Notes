@@ -39,3 +39,16 @@ kubectl port-forward -n prometheus deploy/prometheus-server 8080:9090
 
 # install grafana
 
+helm install grafana grafana/grafana \
+    --namespace grafana \
+    --set persistence.storageClassName="gp2" \
+    --set persistence.enabled=true \
+    --set adminPassword='EKS!sAWSome' \
+    --values ${HOME}/environment/grafana/grafana.yaml \
+    --set service.type=LoadBalancer \
+    --set service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-internal"=0 \
+    --set ingress.enabled=true \
+    --set ingress.annotations."kubernetes\.io/ingress\.class"=alb \
+    --set ingress.annotations."alb\.ingress\.kubernetes\.io/scheme"=internet-facing \
+    --set ingress.annotations."alb\.ingress\.kubernetes\.io/target-type"=ip 
+  
