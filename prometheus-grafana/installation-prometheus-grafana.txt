@@ -27,6 +27,7 @@ eksctl create addon --name aws-ebs-csi-driver --cluster cms-eks --service-accoun
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 helm repo list
+
 kubectl create namespace prometheus
  helm install prometheus prometheus-community/prometheus \
     --namespace prometheus \
@@ -35,7 +36,7 @@ kubectl create namespace prometheus
 
 # port forward
 kubectl port-forward -n prometheus deploy/prometheus-server 8080:9090
-
+-------------------------------------------------------------------------------------------------------------------------------------
 
 # install grafana
 
@@ -51,4 +52,4 @@ helm install grafana grafana/grafana \
     --set ingress.annotations."kubernetes\.io/ingress\.class"=alb \
     --set ingress.annotations."alb\.ingress\.kubernetes\.io/scheme"=internet-facing \
     --set ingress.annotations."alb\.ingress\.kubernetes\.io/target-type"=ip 
-  
+  different approaches 
