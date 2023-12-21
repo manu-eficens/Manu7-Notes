@@ -40,16 +40,44 @@ kubectl port-forward -n prometheus deploy/prometheus-server 8080:9090
 
 # install grafana
 
+# add grafana Helm repo
+helm repo add grafana https://grafana.github.io/helm-charts
+
+mkdir ${HOME}/environment/grafana
+# grafana.yaml
+enabled: true
+storageClassName: gp2
+adminPassword: EKS!sAWSome
+service:
+  type: LoadBalancer
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "alb"  # Use "alb" for Application Load Balancer
+    service.beta.kubernetes.io/aws-load-balancer-internal: "false"
+    service.beta.kubernetes.io/aws-load-balancer-subnets: "subnet-00fd1ae627434038c,subnet-0b3c5a00092527bd3"  # Combine subnets into a single string
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"  # Set to "internal" for internal ALB
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-server.prometheus.svc.cluster.local
+        access: proxy
+        isDefault: true
+
+kubectl create namespace grafana
+
 helm install grafana grafana/grafana \
     --namespace grafana \
     --set persistence.storageClassName="gp2" \
     --set persistence.enabled=true \
     --set adminPassword='EKS!sAWSome' \
     --values ${HOME}/environment/grafana/grafana.yaml \
-    --set service.type=LoadBalancer \
-    --set service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-internal"=0 \
-    --set ingress.enabled=true \
-    --set ingress.annotations."kubernetes\.io/ingress\.class"=alb \
-    --set ingress.annotations."alb\.ingress\.kubernetes\.io/scheme"=internet-facing \
-    --set ingress.annotations."alb\.ingress\.kubernetes\.io/target-type"=ip 
-  different approaches 
+    --set service.type=LoadBalancer
+
+export ELB=$(kubectl get svc -n grafana grafana -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+echo "http://$ELB"
+
+kubectl get secret --namespace grafana grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+
