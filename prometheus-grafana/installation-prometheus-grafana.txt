@@ -1,6 +1,7 @@
 # installation of prometheus and grafana 
 https://sunitabachhav2007.hashnode.dev/prometheus-and-grafana-dashboard-on-eks-cluster-using-helm-chart   (including ebs csi drivers)
 https://archive.eksworkshop.com/intermediate/240_monitoring/prereqs/  (normal direct approach)
+https://docs.aws.amazon.com/eks/latest/userguide/prometheus.html  (aws documentation approach)
 
 # install matrix server
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
