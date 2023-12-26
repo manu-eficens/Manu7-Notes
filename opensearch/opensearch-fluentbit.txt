@@ -1,6 +1,8 @@
 #  LOGGING WITH AMAZON OPENSEARCH, FLUENT BIT, AND OPENSEARCH DASHBOARDS
 #  https://archive.eksworkshop.com/intermediate/230_logging/
 
+step1: CONFIGURE IRSA FOR FLUENT BIT
+
 # Enabling IAM roles for service accounts on your cluster
 eksctl utils associate-iam-oidc-provider \
     --cluster devops-eks \
@@ -47,6 +49,7 @@ arn:aws:iam::238393102293:policy/fluent-bit-policy
 # describe fluent-bit
 kubectl -n logging describe sa fluent-bit
 
+step2: PROVISION AN AMAZON OPENSEARCH CLUSTER
 # creating opensearch cluster
 # name of our Amazon OpenSearch cluster
 export ES_DOMAIN_NAME="eksworkshop-logging"
@@ -68,3 +71,50 @@ curl -sS https://www.eksworkshop.com/intermediate/230_logging/deploy.files/es_do
 aws opensearch create-domain \
   --cli-input-json  file://~/environment/logging/es_domain.json
 
+  
+step3: CONFIGURE AMAZON OPENSEARCH ACCESS  
+  
+  export FLUENTBIT_ROLE=$(eksctl get iamserviceaccount --cluster devops-eks --namespace logging -o json | jq '.[].status.roleARN' -r)
+
+curl -sS -u "Admin:Admin@123" \
+    -X PATCH \
+    "https://search-demo-opensearch-bacfvkkggaglxjjwo23pvxabzy.us-east-1.es.amazonaws.com/_security/api/rolesmapping/all_access?pretty" \
+    -H 'Content-Type: application/json' \
+    -d '[
+        {
+            "op": "add",
+            "path": "/backend_roles",
+            "value": ["'"${FLUENTBIT_ROLE}"'"]
+        }
+    ]'
+
+# modify policy of fluent bit 
+    {
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "*"
+      },
+      "Action": [
+        "es:ESHttp*",
+        "es:ESHttpPut"
+      ],
+      "Resource": "arn:aws:es:us-east-1:238393102293:domain/demo-opensearch/*"
+    }
+  ]
+}
+
+# step4:  DEPLOY FLUENT BIT
+
+export ES_ENDPOINT=$(aws es describe-elasticsearch-domain --domain-name demo-opensearch --output text --query "DomainStatus.Endpoint")
+cd /environment/logging
+curl -o fluentbit.yaml https://archive.eksworkshop.com/intermediate/230_logging/deploy.files/fluentbit.yaml
+
+kubectl apply -f ~/environment/logging/fluentbit.yaml
+
+kubectl --namespace=logging get pods
+
+
+#step5:  now you can OPENSEARCH DASHBOARDS
