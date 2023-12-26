@@ -1,0 +1,70 @@
+#  LOGGING WITH AMAZON OPENSEARCH, FLUENT BIT, AND OPENSEARCH DASHBOARDS
+#  https://archive.eksworkshop.com/intermediate/230_logging/
+
+# Enabling IAM roles for service accounts on your cluster
+eksctl utils associate-iam-oidc-provider \
+    --cluster devops-eks \
+    --approve
+
+# Creating an IAM role and policy for your service account
+mkdir ~/environment/logging/
+
+export ES_DOMAIN_NAME="eksworkshop-logging"
+
+cat <<EoF > ~/environment/logging/fluent-bit-policy.json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Action": [
+                "es:ESHttp*"
+            ],
+            "Resource": "arn:aws:es:${AWS_REGION}:${ACCOUNT_ID}:domain/${ES_DOMAIN_NAME}",
+            "Effect": "Allow"
+        }
+    ]
+}
+EoF
+
+aws iam create-policy   \
+  --policy-name fluent-bit-policy \
+  --policy-document file://~/environment/logging/fluent-bit-policy.json
+
+# Create an IAM role
+
+kubectl create namespace logging
+
+eksctl create iamserviceaccount \
+    --name fluent-bit \
+    --namespace logging \
+    --cluster devops-eks \
+    --attach-policy-arn "arn:aws:iam::238393102293:policy/fluent-bit-policy" \
+    --approve \
+    --override-existing-serviceaccounts
+
+arn:aws:iam::238393102293:policy/fluent-bit-policy
+
+# describe fluent-bit
+kubectl -n logging describe sa fluent-bit
+
+# creating opensearch cluster
+# name of our Amazon OpenSearch cluster
+export ES_DOMAIN_NAME="eksworkshop-logging"
+
+# Elasticsearch version
+export ES_VERSION="OpenSearch_1.0"
+
+# OpenSearch Dashboards admin user
+export ES_DOMAIN_USER="eksworkshop"
+
+# OpenSearch Dashboards admin password
+export ES_DOMAIN_PASSWORD="$(openssl rand -base64 12)_Ek1$"
+
+# Download and update the template using the variables created previously
+curl -sS https://www.eksworkshop.com/intermediate/230_logging/deploy.files/es_domain.json \
+  | envsubst > ~/environment/logging/es_domain.json
+
+# Create the cluster
+aws opensearch create-domain \
+  --cli-input-json  file://~/environment/logging/es_domain.json
+
