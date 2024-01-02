@@ -84,3 +84,6 @@ spec:
               name: kubernetes-dashboard
               port:
                 number: 443
+                
+# k8s dashboard password
+kubectl get secret admin-user -n kubernetes-dashboard -o jsonpath={".data.token"} | base64 -d
