@@ -6,10 +6,49 @@
 # https://archive.eksworkshop.com/beginner/040_dashboard/dashboard/   (Normal approach-- port forwarding )
 # https://upcloud.com/resources/tutorials/deploy-kubernetes-dashboard
 # https://surajblog.medium.com/simplified-deployment-of-kubernetes-dashboard-with-alb-ingress-controller-bf3396c0dc54
-
-
 # https://surajblog.medium.com/simplified-deployment-of-kubernetes-dashboard-with-alb-ingress-controller-bf3396c0dc54 (ALB approach)
 
+
+# install kubernetes dashboard
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+
+# Accessing Dashboard
+
+service-role.yaml 
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kubernetes-dashboard
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin # name: view if read only user required
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kubernetes-dashboard
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-user
+  namespace: kubernetes-dashboard
+  annotations:
+    kubernetes.io/service-account.name: "admin-user"   
+type: kubernetes.io/service-account-token
+
+# Create ALB Ingress Resource for Kubernetes-dashboard
+# ingress.yml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
