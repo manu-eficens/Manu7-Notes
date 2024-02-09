@@ -1,0 +1,117 @@
+node('cloud-slave') {
+  cleanWs()
+  properties([[$class: 'RebuildSettings', autoRebuild: false, rebuildDisabled: false], parameters([string(defaultValue: 'staging', description: '', name: 'env_name', trim: false), string(defaultValue: 'spark', description: '', name: 'platform_name', trim: false), booleanParam(name: 'Build', defaultValue: true, description: 'Toggle this value'), choice(choices: ['424258464218'], description: '', name: 'AccountId'), booleanParam(name: 'Scan', defaultValue: false, description: 'Toggle this value'), string(defaultValue: 'spark-securityscan', description: 'Build Project Name', name: 'app_name', trim: false), string(defaultValue: 'staging', description: 'Git Branch of the Project', name: 'app_branch_name', trim: false), string(defaultValue: '$BUILD_NUMBER', description: '', name: 'dimg_version', trim: false), string(defaultValue: 'us-east-1', description: '', name: 'cluster_region', trim: false), string(defaultValue: 'spark-dev', description: '', name: 'cluster_name', trim: false), string(defaultValue: 'false', description: '', name: 'is_autoscale_enabled', trim: false), string(defaultValue: '', description: '', name: 'autoscale_minpod', trim: false), string(defaultValue: '', description: '', name: 'autoscale_maxpod', trim: false), string(defaultValue: '', description: '', name: 'autoscale_cpupod', trim: false)])])
+  stage ('Build - Checkout') {
+ 	checkout([$class: 'GitSCM', branches: [[name: '*/${app_branch_name}']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'github-netsecpro', url: 'https://github.com/netsecpros/spark-securityscan.git']]]) 
+	//   script {
+    //                 wrap([$class: 'BuildUser']) {
+    //                     def user = env.BUILD_USER_ID
+    //                     currentBuild.displayName = "${app_name}-${env.BUILD_ID}"
+    //                     currentBuild.description = "Build triggered by ${user}"
+    //                 }
+	//          }
+    }
+  stage ('Assume AWS role') {
+                script {
+                    env.STSRESPONSE=sh(returnStdout: true, script: "set +x && aws sts assume-role --role-arn arn:aws:iam::${AccountId}:role/JenkinsDeploymentRole --role-session-name jenkins --profile default | jq -c .")
+                    env.AWS_ACCESS_KEY_ID = sh(returnStdout: true, script: "set +x && echo \$STSRESPONSE | jq -r .Credentials.AccessKeyId").trim()
+                    env.AWS_SECRET_ACCESS_KEY = sh(returnStdout: true, script: "set +x && echo \$STSRESPONSE | jq -r .Credentials.SecretAccessKey").trim()
+                    env.AWS_SESSION_TOKEN = sh(returnStdout: true, script: "set +x && echo \$STSRESPONSE | jq -r .Credentials.SessionToken").trim()
+                    env.AWS_DEFAULT_REGION="${cluster_region}"
+                }
+        }  
+  stage('Build - DockerImage') {
+            env.REPOSITORY_URI = sh (
+            returnStdout: true,
+            script: "                                                            \
+              aws ecr describe-repositories --registry-id ${AccountId}           \
+                                            --repository-names ${app_name}       \
+                                            --region ${cluster_region}           \
+                                            | jq .repositories[].repositoryUri   \
+                                            | tr -d '\n'                         \
+                                            "
+            )
+
+            env.REPOSITORY_NAME = sh ( 
+            returnStdout: true,
+            script: "                                                            \
+              aws ecr describe-repositories --registry-id ${AccountId}           \
+                                            --repository-names ${app_name}       \
+                                            --region ${cluster_region}           \
+                                            | jq .repositories[].repositoryName  \
+                                            | tr -d '\n'                         \
+                                            "
+            )                                
+        sh """
+            if [ "$REPOSITORY_NAME" = "${app_name}" ]; then
+                echo "ECR Repository Exist"
+            else 
+                echo "Creating ECR Repository"
+                aws ecr create-repository --repository-name ${app_name} --image-tag-mutability IMMUTABLE
+            fi 
+            cd ${WORKSPACE}
+            # aws ECR login
+            set +x
+            eval \$(aws ecr get-login --no-include-email --region ${cluster_region})
+            set -x
+            docker build -t ${app_name}:${app_branch_name}${dimg_version} .
+            docker tag ${app_name}:${app_branch_name}${dimg_version} ${REPOSITORY_URI}:${app_branch_name}${dimg_version}
+            docker push ${REPOSITORY_URI}:${app_branch_name}${dimg_version}
+            docker images -q ${app_name}:${app_branch_name}${dimg_version} | xargs docker rmi -f
+          """ 
+      }
+      
+  stage('Send Email') {
+    def commitId = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+    def commitMessage = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
+    def buildUser = currentBuild.getBuildCauses()[0]?.userId ?: 'Unknown User'
+    def changedFiles = sh(script: 'git diff --name-only HEAD^ HEAD', returnStdout: true).trim()
+    def commitAuthor = sh(script: 'git log -1 --pretty=%an', returnStdout: true).trim()
+    def prApprover = sh(script: 'git log -1 --pretty=%cn', returnStdout: true).trim()
+    
+    def htmlBody = """
+    <html>
+    <body>
+        <p><b>Commit Message:</b> $commitMessage</p>
+        <p><b>Commit ID:</b> $commitId</p>
+        <p><b>Build User:</b> $buildUser</p>
+        <p><b>Commit Author:</b> $commitAuthor</p>
+        <p><b>Branch:</b> ${app_branch_name}</p>
+        <p><b>Changed Files:</b></p>
+        <pre>$changedFiles</pre>
+    </body>
+    </html>
+    """
+
+    emailext body: htmlBody,
+              subject: "[${app_name} ${env_name}] - Build triggered for ${dimg_version}",
+              to: 'vamsig@eficensit.com,vijays@eficensit.com,nehad@eficensit.com,satyanarayanat@eficensit.com,vponnada@eficensit.com,nageswart@eficensit.com,vijayadurgar@eficensit.com',
+              mimeType: 'text/html'
+}
+
+  stage ('deploy - Container') {
+      checkout([$class: 'GitSCM', branches: [[name: '*/main']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'github-netsecpro', url: 'https://github.com/netsecpros/aws.git']]])
+ 	  // Shell build step
+      sh '''
+         cd ${WORKSPACE}/cicd/${env_name}/${app_name}
+         sed -i "s,latest,${app_branch_name}${dimg_version}," deployment.yml
+         aws sts get-caller-identity
+         aws eks update-kubeconfig --region us-east-1 --name ${cluster_name}
+         kubectl config use-context arn:aws:eks:us-east-1:${AccountId}:cluster/${cluster_name}
+         kubectl apply -f deployment.yml --namespace=${env_name}                   
+         if [ "$is_autoscale_enabled" = "true" ];then
+            kubectl autoscale deployment ${app_name} --min=${autoscale_minpod} --max=${autoscale_maxpod} --cpu-percent=${autoscale_cpupod} --namespace=${env_name}
+         fi
+         # sleep time required to come up pods
+         sleep 5   
+         export SERVICE=`kubectl get service ${app_name} -o=custom-columns=NAME:.metadata.name --namespace=${env_name} | grep -v NAME`
+         if [ "$SERVICE" = "$app_name" ];then
+            echo "service exist"
+            kubectl apply -f service.yml --namespace=${env_name}
+         else 
+            echo "creating new service"
+            kubectl create -f service.yml --namespace=${env_name}
+         fi   
+         '''  
+      }
+}
