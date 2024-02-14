@@ -8,6 +8,8 @@
 # https://surajblog.medium.com/simplified-deployment-of-kubernetes-dashboard-with-alb-ingress-controller-bf3396c0dc54
 # https://surajblog.medium.com/simplified-deployment-of-kubernetes-dashboard-with-alb-ingress-controller-bf3396c0dc54 (ALB approach)
 
+# Install Metrics Server
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 
 # install kubernetes dashboard
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
