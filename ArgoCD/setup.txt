@@ -4,3 +4,25 @@
 # https://medium.com/@imhamoro/install-argo-cd-to-deploy-services-on-aws-eks-2d47b5bb8f91
 
 # https://medium.com/@taiwolateef55/install-argocd-on-the-eks-cluster-and-configure-synchronization-with-the-github-manifest-repository-292913509307  (correct approach and change  kubectl edit svc argocd-server -n argocd chage clusterip to loadbalancer )
+
+#sync argocd with github yaml file 
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: todo-app-argo
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/manu-207/Githubactions-to-eks.git/app
+    targetRevision: HEAD
+    path: manifest
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: myapp
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+  syncOptions:
+    - CreateNamespace=true
