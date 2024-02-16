@@ -95,9 +95,14 @@ kubectl get secret admin-user -n kubernetes-dashboard -o jsonpath={".data.token"
 aws configure
 aws eks update-kubeconfig --region us-east-1 --name spark-prod 
 kubectl config use-context arn:aws:eks:us-east-1:424258464218:cluster/spark-prod
-
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+# read only access
+kubectl -n prod create token dashboard-view-only
+kubectl proxy or kubectl proxy --port=8888
+http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/#/pod?namespace=prod
+# admin access 
 kubectl create serviceaccount dashboard-admin -n prod 
 kubectl create clusterrolebinding dashboard-admin --clusterrole=cluster-admin --serviceaccount=prod:dashboard-admin 
 kubectl -n prod create token dashboard-admin 
-kubectl proxy
+kubectl proxy or kubectl proxy --port=8888
 
