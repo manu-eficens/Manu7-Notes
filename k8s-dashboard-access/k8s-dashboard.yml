@@ -91,12 +91,13 @@ spec:
 Deploy and Access the Kubernetes Dashboard | Kubernetes
 kubectl get secret admin-user -n kubernetes-dashboard -o jsonpath={".data.token"} | base64 -d
 
-# kubernetes Dashboard access manually
-kubectl create serviceaccount dashboard-admin -n prod
- 
-kubectl create clusterrolebinding dashboard-admin --clusterrole=cluster-admin --serviceaccount=prod:dashboard-admin
- 
-kubectl -n prod create token dashboard-admin
- 
+# kubernetes Dashboard access manually using command line 
+aws configure
+aws eks update-kubeconfig --region us-east-1 --name spark-prod 
+kubectl config use-context arn:aws:eks:us-east-1:424258464218:cluster/spark-prod
+
+kubectl create serviceaccount dashboard-admin -n prod 
+kubectl create clusterrolebinding dashboard-admin --clusterrole=cluster-admin --serviceaccount=prod:dashboard-admin 
+kubectl -n prod create token dashboard-admin 
 kubectl proxy
 
