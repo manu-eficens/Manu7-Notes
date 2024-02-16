@@ -88,4 +88,15 @@ spec:
                 number: 443
                 
 # k8s dashboard password
+Deploy and Access the Kubernetes Dashboard | Kubernetes
 kubectl get secret admin-user -n kubernetes-dashboard -o jsonpath={".data.token"} | base64 -d
+
+# kubernetes Dashboard access manually
+kubectl create serviceaccount dashboard-admin -n prod
+ 
+kubectl create clusterrolebinding dashboard-admin --clusterrole=cluster-admin --serviceaccount=prod:dashboard-admin
+ 
+kubectl -n prod create token dashboard-admin
+ 
+kubectl proxy
+
