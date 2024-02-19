@@ -2,7 +2,7 @@
 # https://medium.com/@chauhanhimani512/install-argocd-on-the-eks-cluster-and-configure-sync-with-the-github-manifest-repository-9e3d62e1c093
 
 # https://medium.com/@imhamoro/install-argo-cd-to-deploy-services-on-aws-eks-2d47b5bb8f91
-
+# https://argo-cd.readthedocs.io/en/stable/getting_started/
 # https://medium.com/@taiwolateef55/install-argocd-on-the-eks-cluster-and-configure-synchronization-with-the-github-manifest-repository-292913509307  (correct approach and change  kubectl edit svc argocd-server -n argocd chage clusterip to loadbalancer )
 
 #sync argocd with github yaml file 
