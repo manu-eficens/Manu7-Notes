@@ -67,7 +67,7 @@ kubectl -n kube-system set image deployment.apps/cluster-autoscaler cluster-auto
 
 
 # Update Cluster Autoscaler Image Version
-kubectl -n kube-system set image deployment.apps/cluster-autoscaler cluster-autoscaler=us.gcr.io/k8s-artifacts-prod/autoscaling/cluster-autoscaler:v1.28.2
+kubectl -n kube-system set image deployment.apps/cluster-autoscaler cluster-autoscaler=us.gcr.io/k8s-artifacts-prod/autoscaling/cluster-autoscaler:v1.26.2
 ```
 
 ## Step-06: Verify Image version got updated
@@ -88,7 +88,7 @@ kubectl -n kube-system get deployment.apps/cluster-autoscaler -o yaml
         - --node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/eksdemo1
         - --balance-similar-node-groups
         - --skip-nodes-with-system-pods=false
-        image: us.gcr.io/k8s-artifacts-prod/autoscaling/cluster-autoscaler:v1.16.5
+        image: us.gcr.io/k8s-artifacts-prod/autoscaling/cluster-autoscaler:v1.26.2
 ```
 
 ## Step-07: View Cluster Autoscaler logs to verify that it is monitoring your cluster load.
