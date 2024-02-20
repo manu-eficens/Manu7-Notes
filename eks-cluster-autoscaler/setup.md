@@ -154,3 +154,6 @@ kubectl get nodes -o wide
 ```
 kubectl delete -f kube-manifests/
 ```
+
+
+https://aws.amazon.com/blogs/containers/autoscaling-amazon-eks-services-based-on-custom-prometheus-metrics-using-cloudwatch-container-insights/
