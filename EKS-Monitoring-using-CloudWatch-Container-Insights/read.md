@@ -1,4 +1,5 @@
 # Monitoring EKS using CloudWatch Container Insigths
+workshop:  https://archive.eksworkshop.com/intermediate/250_cloudwatch_container_insights/
 
 ## Step-01: Introduction
 - What is CloudWatch?
