@@ -32,7 +32,7 @@ spec:
             - name: DB_NAME
               value: "usermgmt"
             - name: DB_USERNAME
-              value: "dbadmin"
+              value: "admin"
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -71,6 +71,6 @@ metadata:
 #type: Opaque means that from kubernetes's point of view the contents of this Secret is unstructured, it can contain arbitrary key-value pairs. In contrast, there is the Secret storing ServiceAccount credentials, or the ones used as ImagePullSecret . These have a constrained contents.
 type: Opaque
 data:
-  # Output of echo -n 'dbpassword11' | base64
-  db-password: ZGJwYXNzd29yZDEx
+  # Output of echo -n 'Manu5718' | base64
+  db-password: TWFudTU3MTg=
 
