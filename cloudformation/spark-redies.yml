@@ -1,0 +1,166 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: AWS CloudFormation Redis ElastiCache template
+Conditions:
+  EnableDNSCondition: !Equals 
+    - !Ref EnableDNS
+    - 'true'
+  CreateFromBackup: !Equals 
+    - !Ref CreateFromBackup
+    - 'Yes'
+  CreateNewCluster: !Equals 
+    - !Ref CreateNewCluster
+    - 'Yes'
+Parameters:
+  ClusterName:
+    Description: The name of the Cluster
+    Type: String
+  CacheParameterGroupName:
+    Description: The name of the parameter group to associate with this cluster
+    Type: String
+  CacheSubnetGroupName:
+    Description: The name of the subnet group to be used for the cluster
+    Type: String
+  EngineType:
+    Description: 'The engine type, memcached or redis'
+    Type: String
+    Default: redis
+  EngineVersion:
+    Description: The engine version
+    Type: String
+    Default: 3.2.4
+  CacheNodeType:
+    Description: >-
+      The compute and memory capacity of the nodes in the Cache Cluster. For a
+      complete list, see here - https://aws.amazon.com/elasticache/pricing/
+    Type: String
+    Default: cache.t3.medium
+  NumberOfCacheNodes:
+    Description: The number of Cache Nodes the Cache Cluster should have
+    Type: Number
+    Default: '1'
+    MinValue: '1'
+    MaxValue: '10'
+    ConstraintDescription: must be between 1 and 10.
+  SnapshotRetentionLimit:
+    Description: >-
+      The number of days for which ElastiCache retains automatic snapshots
+      before deleting them.
+    Type: Number
+  ElasticacheSecurityGroup:
+    Description: One or more VPC security groups associated with the cluster
+    Type: String
+  VpcId:
+    Description: 'The subnet ID, comma separated list'
+    Type: String
+  Change:
+    Description: Change Ticket Number
+    Type: String
+    Default: CHG00
+  Environment:
+    Description: >-
+      Activation Processor environment
+      [QA,Integration,PreProduction,Production,PostProduction]
+    Type: String
+    Default: QA
+    AllowedValues:
+      - Dev
+      - QA
+      - Integration
+      - PreProduction
+      - Production
+      - PostProduction
+      - Performance
+    ConstraintDescription: >-
+      Must be a cloud deployment environment
+      [QA,Integration,PreProduction,Production,PostProduction].
+  Platform:
+    Description: Platform Name
+    Type: String
+  EnableDNS:
+    Description: >-
+      Enable DNS record creation.  Default is false so no updates to property
+      files are required.
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    ConstraintDescription: must true or false.
+  CreateFromBackup:
+    Description: >-
+      Select Yes if you would like to create the Redis cluster from a backup.
+      Only one value amongst CreateFromBackup and CreateNewCluster can be set to
+      Yes. Must specify a value for the RedisBackupArn parameter
+    Type: String
+    Default: 'No'
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  CreateNewCluster:
+    Description: >-
+      Select Yes if you would like to create a new Redis cluster (no data). Only
+      one value amongst CreateFromBackup and CreateNewCluster can be set to Yes
+    Type: String
+    Default: 'Yes'
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  RedisBackupArn:
+    Description: >-
+      A single-element string list containing an ARN
+      (arn:aws:s3:::my_bucket/snapshot1.rdb) that uniquely identifies a Redis
+      RDB snapshot file stored in Amazon S3. Specify this parameter only when
+      you wish to restore a cluster from a Redis backup
+    Type: CommaDelimitedList
+Resources:
+  ElasticacheRedisCluster:
+    Condition: CreateNewCluster
+    Type: 'AWS::ElastiCache::CacheCluster'
+    Properties:
+      AutoMinorVersionUpgrade: 'false'
+      CacheNodeType: !Ref CacheNodeType
+      CacheParameterGroupName: !Ref CacheParameterGroupName
+      CacheSubnetGroupName: !Ref CacheSubnetGroupName
+      ClusterName: !Ref ClusterName
+      Engine: !Ref EngineType
+      EngineVersion: !Ref EngineVersion
+      NumCacheNodes: !Ref NumberOfCacheNodes
+      Port: '6379'
+      SnapshotRetentionLimit: !Ref SnapshotRetentionLimit
+      VpcSecurityGroupIds:
+        - !Ref ElasticacheSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Ref ClusterName
+        - Key: Platform
+          Value: !Ref Platform
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Change
+          Value: !Ref Change
+  ElasticacheRedisClusterFromBackup:
+    Condition: CreateFromBackup
+    Type: 'AWS::ElastiCache::CacheCluster'
+    Properties:
+      AutoMinorVersionUpgrade: 'false'
+      CacheNodeType: !Ref CacheNodeType
+      CacheParameterGroupName: !Ref CacheParameterGroupName
+      CacheSubnetGroupName: !Ref CacheSubnetGroupName
+      ClusterName: !Ref ClusterName
+      Engine: !Ref EngineType
+      EngineVersion: !Ref EngineVersion
+      NumCacheNodes: !Ref NumberOfCacheNodes
+      Port: '6379'
+      SnapshotArns: !Ref RedisBackupArn
+      SnapshotRetentionLimit: !Ref SnapshotRetentionLimit
+      VpcSecurityGroupIds:
+        - !Ref ElasticacheSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Ref ClusterName
+        - Key: Platform
+          Value: !Ref Platform
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Change
+          Value: !Ref Change

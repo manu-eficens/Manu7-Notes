@@ -1,0 +1,193 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Standard Template for Amazon Opensearch Service Domain Creation.
+Parameters:
+  EnvironmentId:
+    Description: 'Environment Designation (QA, preproduction, production etc.)'
+    Type: String
+    Default: QA
+  EnableDNS:
+    AllowedValues:
+      - 'true'
+      - 'false'
+    ConstraintDescription: must true or false.
+    Default: 'false'
+    Description: >-
+      Enable DNS record creation.  Default is false so no updates to property
+      files are required.
+    Type: String
+  DNSShortName:
+    Description: Name of the Opensearch Domain.
+    Type: String
+  DNSZoneName:
+    Description: Name of the Opensearch Domain.
+    Type: String
+    Default: local
+  DomainName:
+    Description: Name of the Opensearch Domain.
+    Type: String
+  VolumeSize:
+    Description: The size of the EBS volume for each data node.
+    Type: Number
+    Default: '20'
+  DedicatedMasterCount:
+    Description: The number of instances to use for the master node.
+    Type: Number
+    Default: '3'
+  DedicatedMasterEnabled:
+    Description: The number of instances to use for the master node.
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    ConstraintDescription: must be true or false.
+  OpensearchVersion:
+    Description: 'The version of opensearch to use'
+    Type: String
+    Default: 'OpenSearch_2.7'
+  InstanceCount:
+    Description: The number of data nodes (instances) to use in the Amazon Opensearch domain.
+    Type: Number
+    Default: '2'
+  InstanceType:
+    Description: The hardware configuration of the instance hosting the data.
+    Type: String
+    Default: t3.medium.search
+  ZoneAwarenessEnabled:
+    Description: Indicates whether to enable zone awareness for the Amazon Opensearch domain.
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    ConstraintDescription: must be true or false.
+  DedicatedMasterType:
+    Description: The hardware configuration of the computer that hosts the master node.
+    Type: String
+    Default: t3.medium.search
+  AutomatedSnapshotStartTime:
+    Description: The number of instances to use for the master node.
+    Type: Number
+    Default: '0'
+  Project:
+    Description: >-
+      Specific component type (e.g. Security Gateway, Audit Support, Bag
+      Management, etc.)
+    Type: String
+  Platform:
+    Description: Application name that this application stack is being used for
+    Type: String
+  Purpose:
+    Description: 'Specify the purpose of this component, such as Web, DB, Application'
+    Type: String
+    AllowedValues:
+      - Web
+      - Application
+      - DB
+      - Bastion
+      - Agent
+      - AgentRelay
+      - Bucket
+      - Build
+      - Security
+    ConstraintDescription: must be a valid purpose.
+  DomainSubnets:
+    Description: List of SubnetIds to auto scale and load balance to
+    Type: CommaDelimitedList
+  VpcId:
+    Description: VpcId to deploy this application to
+    Type: 'AWS::EC2::VPC::Id'
+  DomainSecurityGroup:
+    Description: Security group the Domain to use
+    Type: String
+  HostedZoneId:
+    Description: Hosted Zone ID for the DNS to be created
+    Type: String
+Conditions:
+  EnableDNSCondition: !Equals 
+    - !Ref EnableDNS
+    - 'true'
+  DedicatedMasterCountEnabled: !Equals [!Ref DedicatedMasterEnabled , true]  
+Resources:
+  ESDomain:
+    Type: 'AWS::OpenSearchService::Domain'
+    Properties:
+      AccessPolicies:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - 'es:Describe*'
+              - 'es:List*'
+              - 'es:ESHttpHead'
+              - 'es:ESHttpGet'
+              - 'es:ESHttpDelete'
+              - 'es:ESHttpPut'
+              - 'es:ESHttpPost'
+            Resource: !Join 
+              - ''
+              - - 'arn:aws:es:'
+                - !Ref 'AWS::Region'
+                - ':'
+                - !Ref 'AWS::AccountId'
+                - ':domain/*'
+      AdvancedOptions:
+        rest.action.multi.allow_explicit_index: 'true'
+      DomainName: !Ref DomainName
+      EBSOptions:
+        EBSEnabled: true
+        VolumeSize: !Ref VolumeSize
+        VolumeType: gp2
+    #   ClusterConfig:
+    #     DedicatedMasterCount: !If [ DedicatedMasterCountEnabled, !Ref DedicatedMasterCount, !Ref AWS::NoValue ]
+    #     DedicatedMasterEnabled: !Ref DedicatedMasterEnabled
+    #     DedicatedMasterType: !Ref DedicatedMasterType
+    #     InstanceCount: !Ref InstanceCount
+    #     InstanceType: !Ref InstanceType
+    #     ZoneAwarenessEnabled: !Ref ZoneAwarenessEnabled
+      EngineVersion: !Ref OpensearchVersion
+      Tags:
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref EnvironmentId
+        - Key: Purpose
+          Value: !Ref Purpose
+        - Key: Platform
+          Value: !Ref Platform
+      VPCOptions:
+        SecurityGroupIds:
+          - !Ref DomainSecurityGroup
+        SubnetIds: !Ref DomainSubnets
+  DNSRecord:
+    Type: 'AWS::Route53::RecordSet'
+    Condition: EnableDNSCondition
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Comment: DNS name for my instance.
+      Name: !Join 
+        - ''
+        - - !Ref DNSShortName
+          - .
+          - !Ref DNSZoneName
+          - .
+      Type: CNAME
+      TTL: '900'
+      ResourceRecords:
+        - !GetAtt 
+          - ESDomain
+          - DomainEndpoint
+Outputs:
+  DomainArn:
+    Value: !GetAtt 
+      - ESDomain
+      - DomainArn
+  DomainEndpoint:
+    Value: !GetAtt 
+      - ESDomain
+      - DomainEndpoint
+  DomainSecurityGroupId:
+    Value: !Ref DomainSecurityGroup
+  DNSRecord:
+    Value: !Ref DNSRecord
