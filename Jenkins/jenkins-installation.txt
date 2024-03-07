@@ -1,0 +1,12 @@
+
+    2  cd /etc/yum.repos.d/
+   10  wget https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+   11  sudo yum install epel-release-latest-7.noarch.rpm
+   14  sudo yum install git -y 
+   15  sudo yum update 
+   16  sudo yum install java-11-amazon-corretto-headless
+   17  java -version
+cd /opt/
+wget https://archive.apache.org/dist/maven/maven-3/3.8.5/binaries/apache-maven-3.8.5-bin.tar.gz
+tar xvf apache-maven-3.8.5-bin.tar.gz 
+
