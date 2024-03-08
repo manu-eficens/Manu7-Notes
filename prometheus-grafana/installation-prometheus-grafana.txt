@@ -78,6 +78,8 @@ helm install grafana grafana/grafana \
     --values ${HOME}/environment/grafana/grafana.yaml \
     --set service.type=LoadBalancer
 
+    helm install grafana grafana/grafana --namespace grafana --set persistence.storageClassName="gp2" --set persistence.enabled=true --set adminPassword=Spark@123 --values C:\Users\manmadhab.EFICENS/grafana/grafana.yaml --set service.type=LoadBalancer
+
 export ELB=$(kubectl get svc -n grafana grafana -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 echo "http://$ELB"
 
