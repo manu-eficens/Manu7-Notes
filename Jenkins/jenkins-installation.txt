@@ -27,3 +27,5 @@ cd /etc/yum.repos.d/
    42  sudo systemctl enable jenkins 
    43  sudo systemctl status jenkins
 
+sqa_a829e28a1656ee6ecbcb55fb9ab5631bed2d001e
+
