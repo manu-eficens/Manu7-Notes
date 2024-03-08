@@ -1,0 +1,29 @@
+
+    2  cd /etc/yum.repos.d/
+   10  wget https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+   11  sudo yum install epel-release-latest-7.noarch.rpm
+   14  sudo yum install git -y 
+   15  sudo yum update 
+# https://docs.aws.amazon.com/corretto/latest/corretto-11-ug/amazon-linux-install.html
+   16  sudo yum install java-11-amazon-corretto-headless
+   17  java -version
+cd /opt/
+# https://archive.apache.org/dist/maven/maven-3/
+wget https://archive.apache.org/dist/maven/maven-3/3.8.5/binaries/apache-maven-3.8.5-bin.tar.gz
+tar xvf apache-maven-3.8.5-bin.tar.gz 
+
+sudo yum install docker -y
+ sudo systemctl start docker 
+   31  sudo systemctl enable  docker 
+   32  sudo systemctl status docker
+
+# https://pkg.jenkins.io/redhat-stable/
+
+cd /etc/yum.repos.d/
+   36   sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
+   38  sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+   40  sudo yum install jenkins -y
+   41  sudo systemctl start jenkins 
+   42  sudo systemctl enable jenkins 
+   43  sudo systemctl status jenkins
+
