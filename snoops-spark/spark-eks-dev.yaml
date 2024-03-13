@@ -1,0 +1,471 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'EKS Cluster and Node Setup V1.2'
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: EKS Cluster
+        Parameters:
+          - ClusterName
+          - ClusterVersion
+      - Label:
+          default: Worker Node Configuration
+        Parameters:
+          - NodeAutoScalingGroupMinSize
+          - NodeAutoScalingGroupMaxSize
+          - NodeInstanceRole
+          - AmiId
+          - EbsVolumeSize
+          - DeviceName
+          - EC2KeyName
+          - BootstrapArguments
+          - InstanceTypeP1
+          - InstanceTypeP2
+          - InstanceTypeP3
+          - InstanceTypeP4
+      - Label:
+          default: Worker Network Configuration
+        Parameters:
+          - Env
+          - VpcId
+          - SubnetIds
+      - Label:
+          default: OnDemand Instance Configuration
+        Parameters:
+          - MinOnDemandInstances
+          - PercentOfOnDemandInstances
+Parameters:
+  Platform:
+    Description: Platform Name to tag the resources
+    Default: ''
+    Type: String
+  Project:
+    Description: Project Name to tag the resources
+    Default: ''
+    Type: String
+  ClusterName:
+    Type: String
+    Default: ' '
+  AmiId:
+    Type: String
+    Description: Specifies the AMI ID for your container instances.
+    Default: ami-0923e4b35a30a5f53
+  EC2KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    Default: ''
+  NodeAutoScalingGroupMinSize:
+    Type: Number
+    Description: Minimum size of Node Group ASG.
+    Default: '1'
+  NodeAutoScalingGroupMaxSize:
+    Type: Number
+    Description: Maximum size of Node Group ASG.
+    Default: '1'
+  VpcId:
+    Description: VPC for this instance
+    Type: 'AWS::EC2::VPC::Id'
+    Default: ''
+  BootstrapArguments:
+    Description: Arguments to pass to the bootstrap script.
+    Default: ''
+    Type: String
+  EbsVolumeSize:
+    Type: Number
+    Description: >
+      Optional - Specifies the Size in GBs, of the newly created Amazon Elastic
+      Block Store (Amazon EBS) volume
+    Default: '30'
+  ClusterVersion:
+    Type: String
+    Description: Kubernetes Cluster Version
+    Default: '1.12'
+  Env:
+    Description: Operating environment
+    Type: String
+    Default: DEV
+    AllowedValues:
+      - DEV
+      - QA
+      - INTEGRATION
+      - PROD
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: >
+      Optional - Specifies the Comma separated list of existing VPC Subnet
+      Ids where ECS instances will run
+  EnableSSH:
+    Type: String
+    Description: To Allow SSH or Deny SSH
+    AllowedValues:
+      - 'true'
+      - 'false'
+  Change:
+    Type: String
+    Description: Change Ticket Number For Cluster Upadtes or Changes
+    Default: 123
+  MinOnDemandInstances:
+    Default: '0'
+    Description: Minimum Number of On-Demand EC2 instances to launch
+    Type: Number
+  PercentOfOnDemandInstances:
+    Default: '10'
+    Description: Percentage of On-Demand EC2 instances to launch after Base Capacity is reached
+    Type: Number
+  InstanceTypeP1:
+    Description: Instance Type to be used to launch EC2
+    Type: String
+  InstanceTypeP2:
+    Description: Instance Type to be used to launch EC2
+    Type: String
+  InstanceTypeP3:
+    Description: Instance Type to be used to launch EC2
+    Type: String
+  InstanceTypeP4:
+    Description: Instance Type to be used to launch EC2
+    Type: String
+Mappings:
+  MaxPodsPerNode:
+    m4.large:
+      MaxPods: 20
+    m4.xlarge:
+      MaxPods: 58
+    m4.2xlarge:
+      MaxPods: 58
+    m4.4xlarge:
+      MaxPods: 234
+    m4.10xlarge:
+      MaxPods: 234
+    m5.large:
+      MaxPods: 29
+  IPRangeMap:
+    DEV:
+      Range: 10.199.0.0/16
+    SANDBOX:
+      Range: 10.0.0.0/8
+    QA:
+      Range: 10.199.0.0/16
+    INTEGRATION:
+      Range: 10.201.0.0/17
+    PREPRODUCTION:
+      Range: 10.199.0.0/16
+    PERFORMANCE:
+      Range: 10.199.0.0/16
+    PRODUCTION:
+      Range: 10.220.0.0/16
+    POSTPRODUCTION:
+      Range: 10.220.0.0/16
+Conditions:
+  EnableSSHCondition: !Equals
+    - !Ref EnableSSH
+    - 'true'
+  EnablePort22Condition: !Not
+    - !Equals
+      - !Ref Env
+      - 'PROD'
+
+Resources:
+  ClusterSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub "ClusterSecurityGroup-${Project}"
+      GroupDescription: Cluster communication with worker nodes
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          ToPort: 443
+          FromPort: 443
+          SourceSecurityGroupId: !Ref NodeSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 1025
+          ToPort: 65535
+          DestinationSecurityGroupId: !Ref NodeSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          DestinationSecurityGroupId: !Ref NodeSecurityGroup
+      Tags:
+        - Key: !Sub 'kubernetes.io/cluster/${ClusterName}'
+          Value: owned
+        - Key: Platform
+          Value: !Ref Platform
+        - Key: Project
+          Value: !Ref Project
+
+  NodeSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub "NodeSecurityGroup-${Project}"
+      GroupDescription: Security group for all nodes in the cluster
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: !Sub 'kubernetes.io/cluster/${ClusterName}'
+          Value: owned
+        - Key: Platform
+          Value: !Ref Platform
+        - Key: Project
+          Value: !Ref Project
+
+  NodeSecurityGroupIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: Allow node to communicate with each other
+      GroupId: !Ref NodeSecurityGroup
+      IpProtocol: '-1'
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !Ref NodeSecurityGroup
+
+  NodeSecurityGroupSSHIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: NodeSecurityGroup
+    Condition: EnablePort22Condition
+    Properties:
+      Description: Allows SSH to Node
+      GroupId: !Ref NodeSecurityGroup
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: !FindInMap [ IPRangeMap, !Ref Env, Range ]
+
+  NodeSecurityGroupFromControlPlaneIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: >-
+        Allow worker Kubelets and pods to receive communication from the cluster
+        control plane
+      GroupId: !Ref NodeSecurityGroup
+      SourceSecurityGroupId: !Ref ClusterSecurityGroup
+      IpProtocol: tcp
+      FromPort: 1025
+      ToPort: 65535
+
+  NodeSecurityGroupFromControlPlaneOn443Ingress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    DependsOn: NodeSecurityGroup
+    Properties:
+      Description: >-
+        Allow pods running extension API servers on port 443 to receive
+        communication from cluster control plane
+      GroupId: !Ref NodeSecurityGroup
+      SourceSecurityGroupId: !Ref ClusterSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+
+  Cluster:
+    Type: 'AWS::EKS::Cluster'
+    Properties:
+      Name: !Ref ClusterName
+      Version: !Ref ClusterVersion
+      RoleArn: !GetAtt EKSClusterRole.Arn
+      ResourcesVpcConfig:
+        SecurityGroupIds:
+          - !Ref ClusterSecurityGroup
+        SubnetIds: !Ref SubnetIds
+        
+  EKSClusterRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - eks.amazonaws.com
+            Action:
+            - 'sts:AssumeRole'
+      RoleName: eks-cluster-role
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+        - arn:aws:iam::aws:policy/AmazonEKSServicePolicy        
+
+  NodeInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - !Ref NodeInstanceRole
+      InstanceProfileName: !Sub ${Project}-eksinstanceprofile
+
+  NodeInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${Project}-eks-node-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+
+  ASGPolicyForWorker:
+    Type: "AWS::IAM::Policy"
+    Properties:
+      PolicyName: ASG-Policy-For-Worker
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - autoscaling:DescribeAutoScalingGroups
+          - autoscaling:DescribeAutoScalingInstances
+          - autoscaling:DescribeTags
+          Resource: '*'
+        - Effect: Allow
+          Action:
+          - autoscaling:DescribeAutoScalingGroups
+          - autoscaling:DescribeAutoScalingInstances
+          - autoscaling:SetDesiredCapacity
+          - autoscaling:TerminateInstanceInAutoScalingGroup
+          - autoscaling:DescribeTags
+          Resource: !Sub "arn:${AWS::Partition}:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/${NodeASG}"
+      Roles:
+        - !Ref NodeInstanceRole
+
+  NodeASG:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    DependsOn: Cluster
+    Properties:
+      AutoScalingGroupName: !Sub ${Platform}-${Project}-eks
+      MixedInstancesPolicy:
+        InstancesDistribution:
+          OnDemandAllocationStrategy: prioritized
+          OnDemandBaseCapacity:
+            Ref: MinOnDemandInstances
+          OnDemandPercentageAboveBaseCapacity:
+            Ref: PercentOfOnDemandInstances
+          SpotAllocationStrategy: lowest-price
+          SpotInstancePools: 3
+        LaunchTemplate:
+          LaunchTemplateSpecification:
+              LaunchTemplateId: !Ref NodeLaunchTemplate
+              Version: !GetAtt NodeLaunchTemplate.LatestVersionNumber
+          Overrides:
+            - InstanceType:
+                Ref: InstanceTypeP1
+            - InstanceType:
+                Ref: InstanceTypeP2
+            - InstanceType:
+                Ref: InstanceTypeP3
+            - InstanceType:
+                Ref: InstanceTypeP4
+      MinSize: !Ref NodeAutoScalingGroupMinSize
+      MaxSize: !Ref NodeAutoScalingGroupMaxSize
+      VPCZoneIdentifier: !Ref SubnetIds
+      Tags:
+        - Key: Name
+          Value: !Sub '${ClusterName}-${Project}-ASG-Node'
+          PropagateAtLaunch: 'true'
+        - Key: !Sub 'kubernetes.io/cluster/${ClusterName}'
+          Value: owned
+          PropagateAtLaunch: 'true'
+        - Key: Platform
+          Value: !Ref Platform
+          PropagateAtLaunch: 'true'
+        - Key: Project
+          Value: !Ref Project
+          PropagateAtLaunch: 'true'
+        - Key: k8s.io/cluster-autoscaler/enabled
+          Value: true
+          PropagateAtLaunch: 'true'
+        - Key: !Sub 'k8s.io/cluster-autoscaler/${ClusterName}'
+          Value: owned
+          PropagateAtLaunch: 'true'
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MaxBatchSize: '1'
+        MinInstancesInService: !Ref NodeAutoScalingGroupMinSize
+        PauseTime: PT1M
+
+  NodeLaunchTemplate:
+   Type: AWS::EC2::LaunchTemplate
+   Properties:
+     LaunchTemplateData:
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: !Ref EbsVolumeSize
+              VolumeType: gp2
+              DeleteOnTermination: true
+        IamInstanceProfile:
+          Name:
+            Ref: NodeInstanceProfile
+        ImageId: !Ref AmiId
+        KeyName: !If
+          - EnableSSHCondition
+          - !Ref EC2KeyName
+          - !Ref 'AWS::NoValue'
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub "${ClusterName}-${Project}-ASG-Node"
+              - Key: KubernetesCluster
+                Value: !Ref ClusterName
+              - Key: !Sub 'kubernetes.io/cluster/${ClusterName}'
+                Value: 'owned'
+              - Key: Platform
+                Value: !Ref Platform
+              - Key: Project
+                Value: !Ref Project
+        NetworkInterfaces:
+          -  AssociatePublicIpAddress: 'false'
+             DeviceIndex: 0
+             SubnetId: !Select [0, !Ref SubnetIds]
+             Groups:
+               - !Ref NodeSecurityGroup
+        UserData:
+          'Fn::Base64': !Sub |
+            #!/bin/bash
+            set -o xtrace
+            /etc/eks/bootstrap.sh ${ClusterName} ${BootstrapArguments}
+            /opt/aws/bin/cfn-signal --exit-code $? \
+                      --stack  ${AWS::StackName} \
+                      --resource NodeASG  \
+                      --region ${AWS::Region}
+     LaunchTemplateName: !Sub "${Project}-LaunchTemplate"
+
+Outputs:
+
+  NodeSecurityGroup:
+    Description: Node Security Group
+    Value: !Ref NodeSecurityGroup
+
+  ClusterSecurityGroup:
+    Description: Cluster Security Group
+    Value: !Ref ClusterSecurityGroup
+
+  NodeInstanceRole:
+    Description: IAM Role for Nodes
+    Value: !Ref NodeInstanceRole
+
+  ClusterName:
+    Value: !Ref Cluster
+    Description: Cluster Name
+    Export:
+      Name: !Sub '${AWS::StackName}-ClusterName'
+
+  ClusterArn:
+    Value: !GetAtt Cluster.Arn
+    Description: Cluster Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ClusterArn'
+
+  ClusterEndpoint:
+    Value: !GetAtt Cluster.Endpoint
+    Description: Cluster Endpoint
+    Export:
+      Name: !Sub '${AWS::StackName}-ClusterEndpoint'
