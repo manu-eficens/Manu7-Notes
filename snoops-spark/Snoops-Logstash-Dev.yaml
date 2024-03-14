@@ -1,0 +1,276 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Logstash server with ASG and Loadbalancer
+Outputs:
+  URL:
+    Description: URL of the website
+    Value: !Join 
+      - ''
+      - - 'https://'
+        - !GetAtt 
+          - ElasticLoadBalancer
+          - DNSName
+Conditions:
+  EnableSSHCondition: !Equals 
+    - !Ref EnableSSH
+    - 'true'
+  ELBHealthCheckURLDefinedCondition: !Not 
+    - !Equals 
+      - !Ref ELBHealthCheckURL
+      - NONE
+Parameters:
+  AmiId:
+    Description: ID of the AMI to scale.
+    Type: String
+  Owner:
+    Description: Project Owner Location.
+    Type: String
+  CPUThreshold:
+    Default: '70'
+    Description: CPU Threshold configuration.
+    Type: String
+  ELBIdleTimeout:
+    Default: '60'
+    Description: Load Balancer Idle Timeout
+    Type: Number
+  ELBType:
+    Default: internal
+    Description: Type of ELB - internal or external.
+    Type: String
+  ElbPort:
+    Default: '80'
+    Description: TCP/IP port of the ELB.
+    Type: String
+  EnableSSH:
+    AllowedValues:
+      - 'true'
+      - 'false'
+    ConstraintDescription: must true or false.
+    Default: 'true'
+    Description: >-
+      Enable ssh access.  Default is true so that the resulting instance can be
+      checked in the fabrication environment.
+    Type: String
+  ELBHealthCheckURL:
+    Default: NONE
+    Description: Set the healthcheck URL for the ELB ASG. There is no default.
+    Type: String
+  KeyName:
+    Default: netsec-keypair
+    Description: Key Name for ssh access. This should be a valid key pair name.
+    Type: String
+  Environment:
+    AllowedValues:
+      - Dev
+      - QA
+      - Staging
+      - Prod
+    Description: Type of environment.
+    Type: String
+  HealthCheckPort:
+    Default: '80'
+    Description: TCP/IP port of the web server
+    Type: String
+  InstanceProfile:
+    Description: EC2 instance profile.
+    Type: String
+  ListenerProtocol:
+    Default: http
+    Description: Listenet protocol of the ELB.
+    Type: String
+  OperatorEmail:
+    Description: Email address to notify if there are any scaling operations
+    Type: String
+  Platform:
+    Description: Type of platform
+    Type: String
+  Project:
+    Description: >-
+      Specific component type (e.g. Security Gateway, Audit Support, Bag
+      Management, etc.)
+    Type: String
+  Purpose:
+    AllowedValues:
+      - Web
+      - Application
+      - Infra
+      - Security
+    Description: 'Specify the purpose of this component, such as Web, DB, Application.'
+    Type: String
+  Subnets:
+    Description: The list of SubnetIds in your Virtual Private Cloud (VPC)
+    Type: CommaDelimitedList 
+  LoadBalancerSecurityGroup:
+    Description: Loadbalancer securitygroup
+    Type: String
+  InstanceSecurityGroup:
+    Description: Instance securitygroup
+    Type: String
+  InstanceType:
+    Description: Instance Type to be used to launch EC2
+    Type: String
+  RootVolumeSize:
+    Description: Size of EBS Volume
+    Type: String
+    Default: '16'
+  VolumeType:
+    Description: Volume Type
+    Type: String
+    Default: gp2
+    AllowedValues:
+      - gp2
+      - gp3
+      - io1
+      - io2
+      - sc1
+      - st1
+      - standard
+Resources:
+  ElasticLoadBalancer:
+    Properties:
+      ConnectionSettings:
+        IdleTimeout: !Ref ELBIdleTimeout
+      CrossZone: true
+      HealthCheck:
+        HealthyThreshold: '3'
+        Interval: '30'
+        Target: !If 
+          - ELBHealthCheckURLDefinedCondition
+          - !Join 
+            - ''
+            - - 'HTTPS:'
+              - !Ref HealthCheckPort
+              - !Ref ELBHealthCheckURL
+          - !Join 
+            - ''
+            - - 'TCP:'
+              - !Ref HealthCheckPort
+        Timeout: '25'
+        UnhealthyThreshold: '5'
+      Listeners:
+        - InstancePort: !Ref HealthCheckPort
+          LoadBalancerPort: !Ref ElbPort
+          Protocol: !Ref ListenerProtocol
+          # SSLCertificateId: !Ref SSLCertificateId
+      Scheme: !Ref ELBType
+      Tags:
+        - Key: Platform
+          Value: !Ref Platform
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Purpose
+          Value: !Ref Purpose
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Subnets: !Ref Subnets
+      Instances:
+        - !Ref Instance
+    Type: 'AWS::ElasticLoadBalancing::LoadBalancer'
+  LaunchTemplate:
+    Type: 'AWS::EC2::LaunchTemplate'
+    Properties:
+      LaunchTemplateData:
+        IamInstanceProfile:
+          Name: !Ref InstanceProfile
+        ImageId: !Ref AmiId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds:
+          - !Ref InstanceSecurityGroup
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1
+            Ebs:
+              VolumeSize: !Ref RootVolumeSize
+              VolumeType: !Ref VolumeType
+              DeleteOnTermination: true
+        # NetworkInterfaces:
+        #   - SubnetId: !Ref SubnetId
+        #     DeviceIndex: 0
+        #     AssociatePublicIpAddress: false
+        #     DeleteOnTermination: true
+        Monitoring:
+          Enabled: false
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Join 
+                  - '-'
+                  - - !Ref Project
+                    - Logstash
+                    - !Ref Environment
+                    - LT
+              - Key: Environment
+                Value: !Ref Environment
+              - Key: Platform
+                Value: !Ref Platform
+              - Key: Project
+                Value: !Ref Project
+        UserData: 
+          Fn::Base64: !Sub |
+              #!/bin/bash -xe
+              sudo yum install java -y
+              TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`    
+              private_ip=`curl -H "X-aws-ec2-metadata-token: $TOKEN" -v http://169.254.169.254/latest/meta-data/local-ipv4` 
+              sudo yum install nginx -y
+              sudo systemctl start nginx
+              sudo systemctl enable nginx
+              tee /etc/nginx/conf.d/logstash.conf <<EOF
+              server {
+              listen 80;
+              server_name $private_ip;
+              location / {
+              proxy_pass http://localhost:9600;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              }
+              }
+              EOF
+              sudo sed -i 's/proxy_set_header Host/proxy_set_header Host $host/g' /etc/nginx/conf.d/logstash.conf
+              sudo sed -i 's/proxy_set_header X-Real-IP/proxy_set_header X-Real-IP $remote_addr/g' /etc/nginx/conf.d/logstash.conf
+              sudo systemctl reload nginx
+              sudo rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
+              tee /etc/yum.repos.d/logstash.repo <<EOF
+              [logstash-8.x]
+              name=Elastic repository for 8.x packages
+              baseurl=https://artifacts.elastic.co/packages/8.x/yum
+              gpgcheck=1
+              gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+              enabled=1 
+              autorefresh=1 
+              type=rpm-md 
+              EOF
+              sudo yum update -y
+              sudo yum install logstash -y
+              sudo systemctl enable logstash
+              tee /etc/logstash/conf.d/*.conf <<EOF
+              input {
+              beats {
+              port => 5044
+              }
+              }
+              output {
+              elasticsearch {
+              hosts => [" http://internal-snoops-el-elasticl-86y4o6o48ay8-448527791.us-east-1.elb.amazonaws.com:80"]
+              index => "%{[@metadata][beat]}-%{[@metadata][version]}-%{+YYYY.MM.dd}"
+              user => "elastic"
+              password => "hGbMoV8qj+zX=VFqzfML"
+              }
+              }
+              EOF
+              sudo systemctl start logstash
+      LaunchTemplateName: !Join 
+        - '-'
+        - - !Ref Project
+          - Logstash
+          - !Ref Environment
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      LaunchTemplate: 
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      SubnetId: !Select [ 0, !Ref Subnets ]
