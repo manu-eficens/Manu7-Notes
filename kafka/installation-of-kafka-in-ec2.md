@@ -1,4 +1,6 @@
-kafka documentation 
+# kafka with reverse proxy server
+https://www.cloudkarafka.com/docs/kafkarestproxy.html
+# kafka documentation 
 sudo su -
 apt-get update
 apt-get install -y wget net-tools netcat tar openjdk-8-jdk
@@ -51,8 +53,8 @@ broker.id=0
 #     listeners = listener_name://host_name:port
 #   EXAMPLE:
 #     listeners = PLAINTEXT://your.host.name:9092
-advertised.listeners=PLAINTEXT://52.202.118.130:9092
-zookeeper.connect=52.202.118.130:2181
+advertised.listeners=PLAINTEXT://ip:9092
+zookeeper.connect=ip:2181
 
 
 
@@ -194,10 +196,10 @@ tail -n 10 ~/kafka/logs/kafkaServer.out
 
 
 
-~/kafka/bin/kafka-topics.sh --bootstrap-server 52.202.118.130:9092 --create --topic demo-topic1 --replication-factor 1 --partitions 2
+~/kafka/bin/kafka-topics.sh --bootstrap-server ip:9092 --create --topic demo-topic1 --replication-factor 1 --partitions 2
 
 
-~/kafka/bin/kafka-console-producer.sh --broker-list 52.202.118.130:9092 --topic demo-topic1
+~/kafka/bin/kafka-console-producer.sh --broker-list ip:9092 --topic demo-topic1
 
 
-~/kafka/bin/kafka-console-consumer.sh --bootstrap-server 52.202.118.130:9092 --topic demo-topic1
+~/kafka/bin/kafka-console-consumer.sh --bootstrap-server ip:9092 --topic demo-topic1
