@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  KeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: ShankarRdsDemo-Key
+  VPCId:
+    Type: AWS::EC2::VPC::Id
+    Description: ID of the VPC
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: ID of the Subnet
+
+Resources:
+  SSMRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: SSMRoleForEC2-Kafka
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
+
+  SSMInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      InstanceProfileName: SSMInstanceProfileForEC2-Kafka
+      Roles:
+        - !Ref SSMRole
+
+  KafkaSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Security group allowing all traffic for Kafka'
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        - CidrIp: '0.0.0.0/0'
+          IpProtocol: '-1' # Allow all protocols
+          FromPort: 0
+          ToPort: 65535
+
+  PrivateInstance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: ami-08f7912c15ca96832
+      InstanceType: t3.medium
+      KeyName: !Ref KeyPair
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: false
+          DeleteOnTermination: true
+          DeviceIndex: 0
+          SubnetId: !Ref SubnetId
+          GroupSet:
+            - !Ref KafkaSecurityGroup
+      IamInstanceProfile: !Ref SSMInstanceProfile
+      Tags:
+        - Key: Name
+          Value: Kafka
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          sudo su -
+          apt-get update
+          apt-get install -y wget net-tools netcat tar openjdk-8-jdk
+          wget https://downloads.apache.org/kafka/3.6.1/kafka_2.13-3.6.1.tgz 
+          tar -xzf kafka_2.13-3.6.1.tgz 
+          ln -s kafka_2.13-3.6.1 kafka
