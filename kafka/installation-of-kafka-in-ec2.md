@@ -192,7 +192,7 @@ tail -n 5 ~/kafka/logs/zookeeper.out
 ~/kafka/bin/kafka-server-start.sh -daemon ~/kafka/config/server.properties
 tail -n 10 ~/kafka/logs/kafkaServer.out
 
-
+# with ip endpoint 
 
 ~/kafka/bin/kafka-topics.sh --bootstrap-server 52.202.118.130:9092 --create --topic demo-topic1 --replication-factor 1 --partitions 2
 
@@ -201,3 +201,14 @@ tail -n 10 ~/kafka/logs/kafkaServer.out
 
 
 ~/kafka/bin/kafka-console-consumer.sh --bootstrap-server 52.202.118.130:9092 --topic demo-topic1
+
+# with load balancer endpoint 
+~/kafka/bin/kafka-topics.sh --bootstrap-server spark-dev-kafka-clb-33738784.us-east-1.elb.amazonaws.com:9092 --create --topic demo-topic5 --replication-factor 1 --partitions 2
+
+
+~/kafka/bin/kafka-console-producer.sh --broker-list 35.153.162.0:9092 --topic demo-topic1
+
+
+~/kafka/bin/kafka-console-consumer.sh --bootstrap-server 52.202.118.130:9092 --topic demo-topic1
+
+~/kafka/bin/kafka-topics.sh --bootstrap-server 35.153.162.0:9092 --create --topic demo-topic5 --replication-factor 1 --partitions 2
