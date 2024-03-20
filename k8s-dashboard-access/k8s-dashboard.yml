@@ -90,7 +90,8 @@ spec:
 # k8s dashboard password
 Deploy and Access the Kubernetes Dashboard | Kubernetes
 kubectl get secret admin-user -n kubernetes-dashboard -o jsonpath={".data.token"} | base64 -d
-
+---------------------------------------------------------------------------------------------------------
+# analysis for spark-prod
 # kubernetes Dashboard access manually using command line 
 https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/
 aws configure
@@ -107,4 +108,13 @@ kubectl create clusterrolebinding dashboard-admin --clusterrole=cluster-admin --
 kubectl -n snoops-dev create token dashboard-admin 
 kubectl proxy or kubectl proxy --port=8888
 http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/#/pod?namespace=snoops-dev
+----------------------------------------------------------------------------------------------------------------
+# analysis for snoops-dev
+# install kubernetes dashboard
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+kubectl get svc -n kubernetes-dashboard
+kubectl edit svc kubernetes-dashboard -n kubernetes-dashboard   # LoadBalancer
+kubectl get svc -n kubernetes-dashboard
+nslookup aff5dfd13665f4b1da603a22daf8ea36-1055103295.us-east-1.elb.amazonaws.com
+aws eks get-token --cluster-name snoops-dev | jq -r '.status.token'
 
