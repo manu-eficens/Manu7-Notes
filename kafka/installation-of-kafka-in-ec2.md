@@ -220,6 +220,7 @@ tail -n 10 ~/kafka/logs/kafkaServer.out
 >>>>>>> 36ec3b6b2679b7815d8a9a2f9a1e4928867ee959
 ---------------------------------------------------------
 # hemasai
+~/kafka/bin/kafka-topics.sh --bootstrap-server ip:9092 --create --topic demo-topic1 --replication-factor 1 --partitions 2
 ~/kafka/bin/kafka-topics.sh  --alter --bootstrap-server 172.31.3.102:9092  --topic topic-dev --partitions 8
 
 ~/kafka/bin/kafka-console-producer.sh --bootstrap-server 172.31.3.102:9092 --topic topic-dev 
