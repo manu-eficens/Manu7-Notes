@@ -218,3 +218,22 @@ tail -n 10 ~/kafka/logs/kafkaServer.out
 =======
 ~/kafka/bin/kafka-console-consumer.sh --bootstrap-server ip:9092 --topic demo-topic1
 >>>>>>> 36ec3b6b2679b7815d8a9a2f9a1e4928867ee959
+---------------------------------------------------------
+# hemasai
+~/kafka/bin/kafka-topics.sh  --alter --bootstrap-server 172.31.3.102:9092  --topic topic-dev --partitions 8
+
+~/kafka/bin/kafka-console-producer.sh --bootstrap-server 172.31.3.102:9092 --topic topic-dev 
+
+~/kafka/bin/kafka-console-consumer.sh --bootstrap-server 172.31.3.102:9092 --topic topic-dev --group my-group
+
+
+
+ ~/kafka/bin/kafka-topics.sh --list --bootstrap-server 172.31.3.102:9092
+~/kafka/bin/kafka-topics.sh  --zookeeper 172.31.3.102:2181 --alter --topic topic-dev --partitions 8
+~/kafka/bin/kafka-topics.sh --bootstrap-server 172.31.3.102:9092 --describe --topic topic-dev
+~/kafka/bin/kafka-topics.sh --bootstrap-server 172.31.3.102:9092 --alter --topic topic-dev --replication-factor 1 --partitions 8
+ ~/kafka/bin/kafka-topics.sh --bootstrap-server 172.31.3.102:9092 --describe --topic topic-dev
+  ~/kafka/bin/kafka-topics.sh  --alter --bootstrap-server 172.31.3.102:9092  --topic topic-dev --partitions 8
+ ~/kafka/bin/kafka-topics.sh --bootstrap-server 172.31.3.102:9092 --describe --topic topic-dev
+  ~/kafka/bin/kafka-console-producer.sh --bootstrap-server 172.31.3.102:9092 --topic topic-dev
+
