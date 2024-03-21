@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Amazon Managed Serverless Kafka Cluster
+Parameters:
+  Subnets:
+    Description: The list of SubnetIds in your Virtual Private Cloud (VPC)
+    Type: CommaDelimitedList
+  VpcId:
+    Description: VpcId to deploy the Kafka Cluster
+    Type: String
+  ClusterName:
+    Description: Cluster name for the Kafka Cluster
+    Type: String
+  Platform:
+    Description: Platform of the Kafka Cluster
+    Type: String
+  Project:
+    Description: Project of the Kafka Cluster
+    Type: String
+  Environment:
+    Description: Environment of the Kafka Cluster
+    Type: String 
+Resources:
+  KafkaCluster:
+    Type: AWS::MSK::ServerlessCluster
+    Properties: 
+      ClientAuthentication: 
+        Sasl:
+          Iam:
+            Enabled: true
+      ClusterName: !Ref ClusterName
+      Tags: 
+        Platform: !Ref Platform
+        Project: !Ref Project
+        Environment: !Ref Environment
+      VpcConfigs: 
+        - SecurityGroups: 
+            - !GetAtt KafkaSecurityGroup.GroupId
+          SubnetIds: 
+            - !Select [0, !Ref Subnets]
+            - !Select [1, !Ref Subnets]
+            - !Select [2, !Ref Subnets]
+            - !Select [3, !Ref Subnets]
+  # KafkaVPCConnection:
+  #   Type: AWS::MSK::VpcConnection
+  #   Properties: 
+  #     Authentication: String
+  #     ClientSubnets: 
+  #       - !Ref Subnets
+  #     SecurityGroups: 
+  #       - !GetAtt KafkaSecurityGroup
+  #     Tags: 
+  #       Key: Value
+  #     TargetClusterArn: !GetAtt KafkaCluster
+  #     VpcId: !Ref VpcId
+  KafkaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Security Group for Kafka Access
+      GroupName: !Sub Kafka-${Platform}-${Project}-SG
+      SecurityGroupEgress: 
+        - IpProtocol: tcp
+          FromPort: 9098
+          ToPort: 9098
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 9096
+          ToPort: 9096
+          CidrIp: 0.0.0.0/0  
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
+      Tags: 
+        - Key: Platform
+          Value: !Ref Platform
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref Environment
+      VpcId: !Ref VpcId
