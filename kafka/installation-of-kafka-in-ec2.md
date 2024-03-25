@@ -200,6 +200,11 @@ tail -n 10 ~/kafka/logs/kafkaServer.out
 ~/kafka/bin/kafka-console-producer.sh --bootstrap-server ip:9092 --topic topic-stage
 ~/kafka/bin/kafka-console-consumer.sh --bootstrap-server ip:9092 --topic topic-stage --group my-group
 -------------------------------------------------------------------------------------------------------------------------------
+# hemasai for spark dev approach-2
+~/kafka/bin/kafka-topics.sh --bootstrap-server 172.31.3.102:9092 --describe --topic topic-dev
+~/kafka/bin/kafka-console-consumer.sh --bootstrap-server 172.31.3.102:9092 --topic topic-dev --group development-group
+~/kafka/bin/kafka-consumer-groups.sh --bootstrap-server 172.31.3.102:9092 --list
+~/kafka/bin/kafka-consumer-groups.sh --bootstrap-server 172.31.3.102:9092 --group development-group --describe
 
 # roughf work
 
