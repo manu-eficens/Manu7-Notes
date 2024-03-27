@@ -1,0 +1,16 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: user-authentication
+  labels:
+    app: user-authentication
+    Platform: snoops
+  namespace: snoops-dev
+spec:
+  ports:
+  - port: 80
+    targetPort: 8000
+  selector:
+    app: user-authentication
+  type: NodePort

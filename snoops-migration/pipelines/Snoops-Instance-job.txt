@@ -1,0 +1,28 @@
+node('cloud-slave') {
+  cleanWs()
+  properties([[$class: 'RebuildSettings', autoRebuild: false, rebuildDisabled: false], parameters([choice(choices: ['start','stop'], description: '', name: 'instance_state')])])
+  stage ('Assume AWS role') {
+                script {
+                    env.STSRESPONSE=sh(returnStdout: true, script: "set +x && aws sts assume-role --role-arn arn:aws:iam::424258464218:role/JenkinsDeploymentRole --role-session-name jenkins --profile default | jq -c .")
+                    env.AWS_ACCESS_KEY_ID = sh(returnStdout: true, script: "set +x && echo \$STSRESPONSE | jq -r .Credentials.AccessKeyId").trim()
+                    env.AWS_SECRET_ACCESS_KEY = sh(returnStdout: true, script: "set +x && echo \$STSRESPONSE | jq -r .Credentials.SecretAccessKey").trim()
+                    env.AWS_SESSION_TOKEN = sh(returnStdout: true, script: "set +x && echo \$STSRESPONSE | jq -r .Credentials.SessionToken").trim()
+                    env.AWS_DEFAULT_REGION="us-east-1"
+                }
+        }  
+  stage('Start/Stop-Instance') {
+    sh """
+        if [ "$instance_state" = "start" ]; then
+            echo "Starting Instance"
+            aws ec2 start-instances --instance-ids i-054c513356e6f25db
+        else 
+            echo "Stopping Instance"
+            aws ec2 stop-instances --instance-ids i-054c513356e6f25db
+        fi
+    """
+  }
+  if (instance_state == "start") {
+                def publicIp = sh(returnStdout: true, script: "aws ec2 describe-instances --instance-ids i-054c513356e6f25db --query 'Reservations[*].Instances[*].PublicIpAddress' --output text").trim()
+                echo "Public IP Address: ${publicIp}"
+            }
+}

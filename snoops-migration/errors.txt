@@ -1,0 +1,245 @@
+
+-------------------------------------------------------------------
+# OIDC providers 
+eksctl utils associate-iam-oidc-provider \
+    --region us-east-1 \
+    --cluster snoops-dev \
+    --approve
+-----------------------------------------------------------------------------
+error: nodes are coming but not attached to eks cluster
+# https://docs.aws.amazon.com/eks/latest/userguide/troubleshooting.html
+eksctl create iamidentitymapping --cluster snoops-dev \
+    --arn arn:aws:iam::654654447565:role/Snoops-eks-node-role \
+    --group system:bootstrappers,system:nodes \
+    --username system:node:{{EC2PrivateDNSName}}
+-----------------------------------------------------------------------------
+error: by using jenkis dployment role we are unable access eks cluster 
+eksctl create iamidentitymapping --cluster snoops-dev \
+    --arn arn:aws:iam::654654447565:role/JenkinsDeploymentRole \
+    --group system:master \
+    --username JenkinsDeploymentRole
+-----------------------------------------------------------------
+eksctl get iamidentitymapping --cluster snoops-dev --region=us-east-1
+-------------------------------------------------------------------------
+# snoops-dev-cluster-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jenkins-deployment-role
+rules:
+- apiGroups: [""]
+  resources: ["services", "pods"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["extensions"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["list"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"] # Add more verbs as needed
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "update", "patch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"] # Add more verbs as needed
+- apiGroups: ["elbv2.k8s.aws"]
+  resources: ["targetgroupbindings"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "describe"]
+
+----------------------------------------------------------------------------
+kubectl create serviceaccount snoops -n snoops-dev
+----------------------------------------------------------------------
+# snoops-dev-rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-deployment-rolebinding
+  namespace: snoops-dev
+subjects:
+- kind: User
+  name: JenkinsDeploymentRole
+  apiGroup: rbac.authorization.k8s.io
+- kind: ServiceAccount
+  name: snoops
+  namespace: snoops-dev
+roleRef:
+  kind: ClusterRole
+  name: jenkins-deployment-role
+  apiGroup: rbac.authorization.k8s.io
+
+---------------------------------------------------------------------------
+step7: AWS Load Balancer Controller Install on AWS EKS
+
+Requirements:
+1. Create IAM Policy and make a note of Policy ARN
+2. Create IAM Role and k8s Service Account and bound them together
+3. Install AWS Load Balancer Controller using HELM3 CLI
+4. Understand IngressClass Concept and create a default Ingress Class
+ 
+# 7a. Download IAM Policy
+## Download latest
+curl -o iam_policy_latest.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/main/docs/install/iam_policy.json
+
+# 7b. Create IAM Policy using policy downloaded 
+aws iam create-policy \
+    --policy-name AWSLoadBalancerControllerIAMPolicy \
+    --policy-document file://iam_policy_latest.json
+
+# 7c. Replaced name, cluster and policy arn (Policy arn we took note in step-02)
+eksctl create iamserviceaccount \
+  --cluster=snoops-dev \
+  --namespace=kube-system \
+  --name=aws-load-balancer-controller \
+  --attach-policy-arn=arn:aws:iam::654654447565:policy/AWSLoadBalancerControllerIAMPolicy \
+  --override-existing-serviceaccounts \
+  --approve
+# Get IAM Service Account
+eksctl  get iamserviceaccount --cluster snoops-dev
+
+## 7d. Install the AWS Load Balancer Controller using Helm V3 
+ Install Helm
+- [Install Helm](https://helm.sh/docs/intro/install/) if not installed
+- [Install Helm for AWS EKS](https://docs.aws.amazon.com/eks/latest/userguide/helm.html)
+
+# 7e. If you're using Linux, install the binaries with the following commands.
+curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 > get_helm.sh
+chmod 700 get_helm.sh
+./get_helm.sh
+
+# 7f. Add the eks-charts repository.
+helm repo add eks https://aws.github.io/eks-charts
+
+# 7g.  Update your local repo to make sure that you have the most recent charts.
+helm repo update
+
+## 7h.  Replace Cluster Name, Region Code, VPC ID, Image Repo Account ID and Region Code
+
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=snoops-dev \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller \
+  --set region=us-east-1 \
+  --set vpcId=vpc-0fc902f237f65d10b \
+  --set image.repository=602401143452.dkr.ecr.us-east-1.amazonaws.com/amazon/aws-load-balancer-controller
+
+
+# Verify that the controller is installed.
+kubectl -n kube-system get deployment 
+kubectl -n kube-system get deployment aws-load-balancer-controller
+kubectl -n kube-system describe deployment aws-load-balancer-controller
+
+# Verify AWS Load Balancer Controller Webhook service created
+kubectl -n kube-system get svc 
+kubectl -n kube-system get svc aws-load-balancer-webhook-service
+kubectl -n kube-system describe svc aws-load-balancer-webhook-service
+
+# Review logs for AWS LB Controller POD-1
+kubectl -n kube-system logs -f <POD-NAME> 
+kubectl -n kube-system logs -f  aws-load-balancer-controller-86b598cbd6-5pjfk
+
+----------------------------------------------------------------------------
+error: It seems like you're encountering issues related to building a model in the context of an ingress configuration for a Kubernetes cluster. The errors indicate that there are problems with auto-discovering subnets, particularly in relation to the Kubernetes internal ELB (Elastic Load Balancer). to resolve the issue add  
+alb.ingress.kubernetes.io/subnets: subnet-0d579244c060ac026,subnet-0a212a8a5e122a4b7
+-------------------------------------------------------------------------------
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+# backend-ingress.yaml
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "60"
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/success-codes: 200-499
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/subnets: subnet-0d579244c060ac026,subnet-0a212a8a5e122a4b7
+    kubernetes.io/ingress.class: alb
+  name: snoops-backend-private
+  namespace: snoops-dev
+spec:
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: user-authentication
+            port:
+              number: 80
+        path: /authentication
+        pathType: Prefix
+      - backend:
+          service:
+            name: snoops-data-ingestion
+            port:
+              number: 80
+        path: /data-ingestion
+        pathType: Prefix
+----------------------------------------------------------------------------------------------------
+# error
+# delete namespace for its take too much of time 
+NS=`kubectl get ns |grep Terminating | awk 'NR==1 {print $1}'` && kubectl get namespace "$NS" -o json   | tr -d "\n" | sed "s/\"finalizers\": \[[^]]\+\]/\"finalizers\": []/"   | kubectl replace --raw /api/v1/namespaces/$NS/finalize -f -
+--------------------------------------------------------------------------
+
+# Install Metrics Server
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+-----------------------------------------------------------------------------
+# install kubernetes dashboard
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+kubectl get svc -n kubernetes-dashboard
+kubectl edit svc kubernetes-dashboard -n kubernetes-dashboard   # LoadBalancer
+kubectl get svc -n kubernetes-dashboard
+nslookup aff5dfd13665f4b1da603a22daf8ea36-1055103295.us-east-1.elb.amazonaws.com
+aws eks get-token --cluster-name snoops-dev | jq -r '.status.token'
+-----------------------
+https://aff5dfd13665f4b1da603a22daf8ea36-1055103295.us-east-1.elb.amazonaws.com
+-----------------------------------------------------------------------------
+#cluster auto scaling 
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/autoscaler/master/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-autodiscover.yaml
+kubectl -n kube-system annotate deployment.apps/cluster-autoscaler cluster-autoscaler.kubernetes.io/safe-to-evict="false"
+kubectl -n kube-system edit deployment.apps/cluster-autoscaler
+
+        - --node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/snoops-dev
+        - --balance-similar-node-groups
+        - --skip-nodes-with-system-pods=false
+-------------------------------------------------------------------------------
+# data base creation snoops_data_ingestion
+CREATE DATABASE snoops_data_ingestion
+    WITH
+    OWNER = dbuser
+    ENCODING = 'UTF8'
+    LC_COLLATE = 'en_US.UTF-8'
+    LC_CTYPE = 'en_US.UTF-8'
+    TABLESPACE = pg_default
+    CONNECTION LIMIT = -1
+    IS_TEMPLATE = False;
+------------------------------------
+# create schema 
+CREATE SCHEMA IF NOT EXISTS public
+    AUTHORIZATION dbuser;
+
+COMMENT ON SCHEMA public
+    IS 'standard public schema';
+
+GRANT ALL ON SCHEMA public TO PUBLIC;
+
+GRANT ALL ON SCHEMA public TO dbuser;
+
+
+
+
+

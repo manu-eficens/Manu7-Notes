@@ -1,0 +1,16 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: snoops-data-ingestion
+  labels:
+    app: snoops-data-ingestion
+    Platform: snoops
+  namespace: snoops-dev
+spec:
+  ports:
+  - port: 80
+    targetPort: 8000
+  selector:
+    app: snoops-data-ingestion
+  type: NodePort
