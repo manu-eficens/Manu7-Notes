@@ -220,7 +220,7 @@ tail -n 10 ~/kafka/logs/kafkaServer.out
 ~/kafka/bin/kafka-consumer-groups.sh --bootstrap-server ip:9092 --list
 ~/kafka/bin/kafka-consumer-groups.sh --bootstrap-server ip:9092 --group stage-group --describe
 
-# create consumer group for stage
+# create consumer group for prod
 /kafka/bin/kafka-topics.sh --bootstrap-server ip:9092 --describe --topic topic-prod
 /kafka/bin/kafka-console-consumer.sh --bootstrap-server ip:9092 --topic topic-prod --group prod-group
 /kafka/bin/kafka-consumer-groups.sh --bootstrap-server ip:9092 --list
