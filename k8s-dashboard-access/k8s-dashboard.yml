@@ -117,4 +117,11 @@ kubectl edit svc kubernetes-dashboard -n kubernetes-dashboard   # LoadBalancer
 kubectl get svc -n kubernetes-dashboard
 nslookup aff5dfd13665f4b1da603a22daf8ea36-1055103295.us-east-1.elb.amazonaws.com
 aws eks get-token --cluster-name snoops-dev | jq -r '.status.token'
+------------------------------------------------------------------------------------------------------------------
+# admin access for spark production env
+kubectl create serviceaccount dashboard-admin -n prod
+kubectl create clusterrolebinding dashboard-admin --clusterrole=cluster-admin --serviceaccount=prod:dashboard-admin 
+kubectl -n prod create token dashboard-admin 
+kubectl proxy or kubectl proxy --port=8888
+http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/#/pod?namespace=prod
 
