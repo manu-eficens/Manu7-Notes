@@ -15,6 +15,26 @@ dataDir=/root/zookeeper
 clientPort=2181
 maxClientCnxns=0
 
+------------------------------------------
+# kafka with reverse proxy server
+https://www.cloudkarafka.com/docs/kafkarestproxy.html
+# kafka documentation 
+sudo su -
+apt-get update
+apt-get install -y wget net-tools netcat tar openjdk-8-jdk
+wget https://downloads.apache.org/kafka/3.6.2/kafka_2.13-3.6.2.tgz 
+tar -xzf kafka_2.13-3.6.2.tgz 
+ln -s kafka_2.13-3.6.2 kafka
+mkdir zookeeper
+cd ~/kafka/config/
+vi zookeeper.properties
+
+dataDir=/root/zookeeper
+clientPort=2181
+maxClientCnxns=0
+
+
+
 rm -rf server.properties
 ---------------------------------------
 vi server.properties
