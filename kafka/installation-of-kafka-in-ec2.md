@@ -271,5 +271,19 @@ tail -n 10 ~/kafka/logs/kafkaServer.out
 ~/kafka/bin/kafka-console-consumer.sh --bootstrap-server ip:9092 --topic demo-topic1
 >>>>>>> 36ec3b6b2679b7815d8a9a2f9a1e4928867ee959
 ---------------------------------------------------------
+# uninstall kafka 
+sudo rm -rf /etc/kafka
+sudo rm -rf /var/lib/kafka
+sudo apt-get remove kafka
+ls
+rm -rf kafka
+rm -rf kafka_2.13-3.6.2
+rm -rf kafka_2.13-3.6.2.tgz
+ls
+rm -rf zookeeper/
+sudo find / -name meta.properties
+cd /home/ubuntu/
+ls
+rm -rf kafka-logs
 
 
