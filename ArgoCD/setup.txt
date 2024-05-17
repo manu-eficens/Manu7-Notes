@@ -9,6 +9,18 @@ kubectl get secret argocd-initial-admin-secret -n argocd -o yaml
 V3ZaJN6Rv8HzvzZ3
 #argocd login
 argocd login $(kubectl get service argocd-server -n argocd --output=jsonpath='{.status.loadBalancer.ingress[0].hostname}') --username admin --password $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo) --insecure
+# cluster adding 
+kubectl get configmap -n argocd 
+kubectl edit configmap argocd-cmd-params-cm -n argocd
+Data:
+    Service.insecure: "true"
+
+	1. kubectl config get-contexts | grep cloudbeat-eks
+	2. argocd login ip/load balancer/domain
+	Username:
+	Password:
+argocd cluster add arn:aws:eks:us-east-1:525679290213:cluster/cb-eks --name snoops-staging --server adffbe0ecb8864373a7f7f953b21306c-363956394.us-east-1.elb.amazonaws.com
+
 # github access key: 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
 # git repo adding in argo cd 
 argocd repo add https://github.com/manu-207/argocd-practice.git --username manu-207 --password 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
