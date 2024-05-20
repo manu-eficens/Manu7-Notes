@@ -33,6 +33,37 @@ dataDir=/root/zookeeper
 clientPort=2181
 maxClientCnxns=0
 
+vi zookeeper.properties
+-------------------------------------------------------------
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# the directory where the snapshot is stored.
+dataDir=/root/zookeeper
+# the port at which the clients will connect
+clientPort=2181
+# disable the per-ip limit on the number of connections since this is a non-production config
+maxClientCnxns=0
+# Disable the adminserver by default to avoid port conflicts.
+# Set the port to something non-conflicting if choosing to enable this
+admin.enableServer=false
+# admin.serverPort=8078
+tickTime=2000
+#dataDir=/var/lib/zookeeper
+#clientPort=2181
+initLimit=5
+syncLimit=2
 
 
 rm -rf server.properties
@@ -209,7 +240,7 @@ cd /root
 
 
 ~/kafka/bin/zookeeper-server-start.sh -daemon ~/kafka/config/zookeeper.properties
-tail -n 5 ~/kafka/logs/zookeeper.out
+tail -n 10 ~/kafka/logs/zookeeper.out
 
 ~/kafka/bin/kafka-server-start.sh -daemon ~/kafka/config/server.properties
 tail -n 10 ~/kafka/logs/kafkaServer.out
