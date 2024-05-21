@@ -1,3 +1,6 @@
+# installation of kafka using docker compose 
+https://www.youtube.com/watch?v=nZeDNMTgQUA
+------------------------------------------------------
 # kafka with reverse proxy server
 https://www.cloudkarafka.com/docs/kafkarestproxy.html
 # kafka documentation 
