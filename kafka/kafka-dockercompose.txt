@@ -1,26 +1,48 @@
 # installation of kafka using docker compose 
 https://www.youtube.com/watch?v=nZeDNMTgQUA
 ------------------------------------------------------
-# commands
-
-# dockercompose.yaml 
+# docker installation
+sudo yum install docker -y
+sudo systemctl start docker
+sudo systemctl status docker
+---------------------------
+# docker compose installation
+docker --version
+sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+docker-compose --version
+-----------------------------------------------
+vi docker-compose.yml
 version: '2'
 services:
   zookeeper:
-    image: wurstmeister/zookeeper:3.4.6
+    image: wurstmeister/zookeeper:latest
+    container_name: zookeeper
     ports:
       - "2181:2181"
+    restart: unless-stopped
+
   kafka:
-    image: wurstmeister/kafka:2.12-2.5.0
+    image: wurstmeister/kafka:latest
+    container_name: kafka
     ports:
       - "9092:9092"
-    expose:
-      - "9093"
+      - "9093:9093"
     environment:
-      KAFKA_ADVERTISED_LISTENERS: INSIDE://localhost:9093,OUTSIDE://<EC2_PRIVATE_IP>:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
-      KAFKA_LISTENERS: INSIDE://0.0.0.0:9093,OUTSIDE://0.0.0.0:9092
+      KAFKA_ADVERTISED_HOST_NAME: 10.0.5.48
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+--------------------------------------------------------------------------
+docker-compose up -d
+docker ps
+docker exec -it kafka /bin/bash
+# commands
+kafka-topics.sh --create --topic topic-prod --zookeeper 10.0.5.48:2181 --partitions 8 --replication-factor 1
+kafka-topics.sh --list --zookeeper 10.0.5.48:2181
+kafka-console-consumer.sh --bootstrap-server 10.0.5.48:9092 --topic topic-prod --group prod-group --from-beginning
+kafka-consumer-groups.sh --bootstrap-server 10.0.5.48:9092 --list
+kafka-consumer-groups.sh --bootstrap-server 10.0.5.48:9092 --describe --group prod-group
+kafka-console-producer.sh --broker-list 10.0.5.48:9092 --topic topic-prod
+kafka-console-consumer.sh --bootstrap-server 10.0.5.48:9092 --topic topic-prod --group prod-group --from-beginning
