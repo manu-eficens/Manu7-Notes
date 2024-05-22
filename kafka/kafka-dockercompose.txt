@@ -38,6 +38,7 @@ services:
 docker-compose up -d
 docker ps
 docker exec -it kafka /bin/bash
+cd /opt/kafka/bin/
 # commands
 kafka-topics.sh --create --topic topic-prod --zookeeper 10.0.5.48:2181 --partitions 8 --replication-factor 1
 kafka-topics.sh --list --zookeeper 10.0.5.48:2181
