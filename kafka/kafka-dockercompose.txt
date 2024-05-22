@@ -1,5 +1,7 @@
-
-
+# installation of kafka using docker compose 
+https://www.youtube.com/watch?v=nZeDNMTgQUA
+------------------------------------------------------
+# commands
 
 # dockercompose.yaml 
 version: '2'
