@@ -46,7 +46,7 @@ kafka-console-consumer.sh --bootstrap-server 10.0.5.48:9092 --topic topic-prod -
 kafka-consumer-groups.sh --bootstrap-server 10.0.5.48:9092 --list
 kafka-consumer-groups.sh --bootstrap-server 10.0.5.48:9092 --describe --group prod-group
 kafka-console-producer.sh --broker-list 10.0.5.48:9092 --topic topic-prod
-kafka-console-consumer.sh --bootstrap-server 10.0.5.48:9092 --topic topic-prod --group prod-group --from-beginning
+kafka-console-consumer.sh --bootstrap-server 10.0.5.48:9092 --topic topic-prod --group prod-group 
 ---------------------------------------------------------------
 # individual restart with docker compose
 docker-compose restart zookeeper
