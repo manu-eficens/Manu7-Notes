@@ -239,10 +239,11 @@ zookeeper.connection.timeout.ms=6000
 
 cd /root
 
-
+~/kafka/bin/zookeeper-server-stop.sh
 ~/kafka/bin/zookeeper-server-start.sh -daemon ~/kafka/config/zookeeper.properties
 tail -n 10 ~/kafka/logs/zookeeper.out
-
+------------------------------------------
+~/kafka/bin/kafka-server-stop.sh
 ~/kafka/bin/kafka-server-start.sh -daemon ~/kafka/config/server.properties
 tail -n 10 ~/kafka/logs/kafkaServer.out
 
