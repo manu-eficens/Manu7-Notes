@@ -57,4 +57,7 @@ cd /path/to/your/docker-compose.yml
 docker-compose restart
 ---------------------------------------
 
-
+SELECT id, notification_data, user_id, notification_read_time, read_status, seen_status, date_added, last_modified, created_by, last_modified_by, notification_id
+	FROM public.events_notifications_notification_user
+	order by date_added DESC
+	limit 100;
