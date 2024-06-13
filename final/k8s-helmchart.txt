@@ -331,16 +331,6 @@ helm status mychart1-1689683948 --show-resources
 # Install Helm Chart 
 helm install dev101 stacksimplify/mychart1
 
-# List Helm Release
-helm list 
-
-# List Kubernetes Resources Deployed as part of this Helm Release
-helm status dev101 --show-resources
-
-# Access Application
-http://localhost:31231
-```
-
 ## Step-03: Install Helm Chart - Release: qa101
 ```t
 # Install Helm Chart 
@@ -359,8 +349,6 @@ helm uninstall qa101
 # List Helm Release
 helm list 
 ```
-
-
 ## Step-04: Install Helm Chart - Release: qa101 with --atomic flag
 - when `--atomic` flagis set, the installation process deletes the installation on failure. 
 - The `--wait` flag will be set automatically if `--atomic` is used
@@ -387,6 +375,43 @@ helm uninstall dev101
 helm list
 ```
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Helm with Kubernetes Namespaces
+# Install Helm Release by creating Kubernetes Namespace
+helm install dev101 stacksimplify/mychart2 --version "0.1.0" --namespace dev --create-namespace 
+
+# List Kubernetes Namespaces 
+kubectl get ns
+Observation: Found the dev namespace created as part of `helm install`
+
+# List Helm Release
+helm list --> NO RELEASES in default namespace
+helm list -n dev
+helm list --namespace dev
+
+# Helm Status
+helm status dev101 --show-resources -n dev
+helm status dev101 --show-resources --namespace dev
+
+## Step-03: Run helm upgrade for resources present in dev namespace
+```t
+# Helm Upgrade
+helm upgrade dev101 stacksimplify/mychart2 --version "0.2.0" --namespace dev 
+or
+helm upgrade dev101 stacksimplify/mychart2 --version "0.2.0" -n dev
+
+## Step-04: Uninstall Helm Release from dev Namespace
+```t
+
+# List Kubernetes Namespaces
+kubectl get ns
+Observation: 
+1. When uninstalling helm release, it will not delete the Kubernetes Resource: dev namespace. 
+2. If we dont need that dev namespace we need to manually delete it from kubernetes using kubectl
+
+# Delete dev namespace
+kubectl delete ns dev
+```
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 
