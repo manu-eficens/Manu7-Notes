@@ -112,10 +112,6 @@ helm list --deployed
 # Helm Upgrade to 3.0.0
 helm upgrade myapp1 kalyan-repo/myapp1 --set "image.tag=3.0.0"
 
-# Access Application
-http://localhost:<NODE-PORT>
-http://localhost:31231
-
 # Helm Upgrade to 4.0.0
 helm upgrade myapp1 kalyan-repo/myapp1 --set "image.tag=4.0.0"
 ## Step-07: Helm History
@@ -149,7 +145,7 @@ helm status myapp1 --revision 2
 # Uninstall Helm Release
 helm uninstall myapp1
 ```
----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 
