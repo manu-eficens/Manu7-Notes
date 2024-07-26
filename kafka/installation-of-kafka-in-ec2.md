@@ -279,6 +279,9 @@ tail -n 10 ~/kafka/logs/kafkaServer.out
 /kafka/bin/kafka-consumer-groups.sh --bootstrap-server ip:9092 --list
 /kafka/bin/kafka-consumer-groups.sh --bootstrap-server ip:9092 --group prod-group --describe
 
+### command to list the topic list
+~/kafka/bin/kafka-topics.sh --bootstrap-server 172.31.3.169:9092 --list
+
 # roughf work
 
 ~/kafka/bin/kafka-topics.sh --bootstrap-server ip:9092 --create --topic demo-topic1 --replication-factor 1 --partitions 2
