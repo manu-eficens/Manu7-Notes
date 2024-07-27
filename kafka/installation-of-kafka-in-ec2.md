@@ -281,6 +281,15 @@ tail -n 10 ~/kafka/logs/kafkaServer.out
 
 ### command to list the topic list
 ~/kafka/bin/kafka-topics.sh --bootstrap-server 172.31.3.169:9092 --list
+### command to delete topic
+~/kafka/bin/kafka-topics.sh --bootstrap-server 172.31.3.236:9092 --delete --topic <topic-name>
+
+### command to list groups
+~/kafka/bin/kafka-consumer-groups.sh --bootstrap-server 172.31.3.236:9092 --list
+### command to delete group
+bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --delete --group myscans-dev-group
+
+
 
 # roughf work
 
@@ -321,5 +330,7 @@ sudo find / -name meta.properties
 cd /home/ubuntu/
 ls
 rm -rf kafka-logs
+sudo rm /etc/systemd/system/kafka.service
+sudo rm /etc/systemd/system/zookeeper.service
 
 
