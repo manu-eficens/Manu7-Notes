@@ -1,0 +1,32 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: dc-eks
+  region: us-east-1
+  version: "1.30"
+
+vpc:
+  subnets:
+    private:
+      us-east-1a: { id: subnet-05c559f15c9f572c4 }
+      us-east-1b: { id: subnet-0362116a248942f10 }
+    public:
+      us-east-1a: { id: subnet-0e6097e7aae859dae }
+      us-east-1b: { id: subnet-02899a4ed8a514afa }
+
+managedNodeGroups:
+  - name: dc-ng-new
+    minSize: 1
+    maxSize: 8
+    desiredCapacity: 1
+    instanceType: t3.medium
+    labels: {role: worker}
+    ssh:
+      publicKeyName: discovercloud-master-key
+    tags:
+      nodegroup-role: worker
+    iam:
+      withAddonPolicies:
+        externalDNS: true
+        certManager: true
+        albIngress: true
