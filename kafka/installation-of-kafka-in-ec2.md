@@ -316,6 +316,17 @@ bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --delete --group 
 ~/kafka/bin/kafka-console-consumer.sh --bootstrap-server ip:9092 --topic demo-topic1
 >>>>>>> 36ec3b6b2679b7815d8a9a2f9a1e4928867ee959
 ---------------------------------------------------------
+~/kafka/bin/kafka-topics.sh --bootstrap-server 172.31.3.236:9092 --create --topic scan-processing-topic-dev --replication-factor 1 --partitions 20
+~/kafka/bin/kafka-topics.sh --bootstrap-server 172.31.3.236:9092 --describe --topic scan-processing-topic-dev
+~/kafka/bin/kafka-console-consumer.sh --bootstrap-server 172.31.3.236:9092 --topic scan-processing-topic-dev --group scan-processing-group-dev
+~/kafka/bin/kafka-consumer-groups.sh --bootstrap-server 172.31.3.236:9092 --list
+~/kafka/bin/kafka-consumer-groups.sh --bootstrap-server 172.31.3.236:9092 --group scan-processing-group-dev --describe
+
+~/kafka/bin/kafka-topics.sh --bootstrap-server 172.31.3.236:9092 --list
+~/kafka/bin/kafka-consumer-groups.sh --bootstrap-server 172.31.3.236:9092 --delete --group scan-processing-group-dev
+
+~/kafka/bin/kafka-topics.sh --bootstrap-server 172.31.3.236:9092 --delete --topic scan-processing-topic-dev
+---------------------------
 # uninstall kafka 
 sudo rm -rf /etc/kafka
 sudo rm -rf /var/lib/kafka
