@@ -1,0 +1,18 @@
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: notify-expiring-tokens
+spec:
+  schedule: "5 9 * * *"  # Runs daily at midnight
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: notify-expiring-tokens
+              image: manu207/notify-expiring-tokens:latest
+              envFrom:
+                - secretRef:
+                    name: jenkins-email-db-secret
+          restartPolicy: OnFailure
