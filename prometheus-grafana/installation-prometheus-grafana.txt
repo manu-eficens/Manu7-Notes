@@ -40,7 +40,7 @@ helm install prometheus prometheus-community/prometheus --namespace prometheus -
 # port forward
 kubectl port-forward -n prometheus deploy/prometheus-server 8080:9090
 -------------------------------------------------------------------------------------------------------------------------------------
-subnet-0fe8e450bc917d52c,subnet-0023ff4bd4ab4e6e6,subnet-025a00cbb2e8f88ac,subnet-0adc595abd8d30780
+
 # install grafana
 
 # add grafana Helm repo
