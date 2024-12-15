@@ -129,6 +129,13 @@ helm install promtail grafana/loki-stack \
     --set loki.enabled=false \
     --set promtail.enabled=true \
     --set promtail.config.lokiAddress="http://loki:3100/loki/api/v1/push"
+
+In the Grafana UI, go to Configuration > Data Sources.
+Add a new data source:
+Select Loki as the data source type.
+Use the Loki URL (http://loki.loki.svc.cluster.local:3100) as the data source URL.
+Save and test the data source configuration.
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------
 # approach with custom  values.yaml
 promtail:
