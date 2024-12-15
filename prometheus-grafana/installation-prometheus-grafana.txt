@@ -108,3 +108,51 @@ helm install prometheus prometheus-community/prometheus --namespace prometheus -
 kubectl port-forward -n prometheus deploy/prometheus-server 8080:9090
 localhost:8080
 
+----------------------------------------------------------------------------
+
+kubectl create namespace loki
+helm install loki grafana/loki-stack --namespace loki --set grafana.enabled=false --set promtail.enabled=false
+helm install promtail grafana/loki-stack --namespace loki --set loki.enabled=false --set promtail.enabled=true --set promtail.config.lokiAddress="http://loki:3100/loki/api/v1/push"
+     or 
+------------------------------------------------------------------------------------------------------------------------------------------
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+
+kubectl create namespace loki
+helm install loki grafana/loki-stack \
+    --namespace loki \
+    --set grafana.enabled=false \
+    --set promtail.enabled=false
+
+helm install promtail grafana/loki-stack \
+    --namespace loki \
+    --set loki.enabled=false \
+    --set promtail.enabled=true \
+    --set promtail.config.lokiAddress="http://loki:3100/loki/api/v1/push"
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+# approach with custom  values.yaml
+promtail:
+  config:
+    clients:
+      - url: http://loki.loki.svc.cluster.local:3100/loki/api/v1/push
+    positions:
+      filename: /data/positions.yaml
+    server:
+      http_listen_port: 9080
+    scrape_configs:
+      - job_name: kubernetes-pods
+        pipeline_stages:
+          - cri: {}
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: kubernetes-pods
+              __path__: /var/log/pods/*/*/*.log
+
+helm install promtail grafana/loki-stack \
+    --namespace loki \
+    --values promtail-values.yaml
+ 
+
+
