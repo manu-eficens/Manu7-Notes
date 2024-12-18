@@ -160,6 +160,26 @@ promtail:
 helm install promtail grafana/loki-stack \
     --namespace loki \
     --values promtail-values.yaml
- 
+ ------------------------------------------------------------
+
+kubectl create namespace loki
+
+helm install loki grafana/loki-distributed --namespace loki --set storageClassName=gp2 --set persistence.enabled=true
+
+helm install promtail grafana/promtail --namespace loki \
+  --set config.clients[0].url=http://loki.loki.svc.cluster.local:3100/loki/api/v1/push \
+  --set config.scrape_configs[0].job_name=kubernetes-pods \
+  --set config.scrape_configs[0].kubernetes_sd_configs[0].role=pod \
+  --set config.scrape_configs[0].relabel_configs[0].source_labels[0]=__meta_kubernetes_pod_label_name \
+  --set config.scrape_configs[0].relabel_configs[0].action=keep \
+  --set config.scrape_configs[0].relabel_configs[0].regex=.* \
+  --set config.scrape_configs[0].relabel_configs[1].source_labels[0]=__meta_kubernetes_namespace \
+  --set config.scrape_configs[0].relabel_configs[1].target_label=namespace \
+  --set config.scrape_configs[0].relabel_configs[2].source_labels[0]=__meta_kubernetes_pod_name \
+  --set config.scrape_configs[0].relabel_configs[2].target_label=pod
+       
+                             (or)
+
+helm install promtail grafana/promtail --namespace loki --set config.clients[0].url=http://loki.loki.svc.cluster.local:3100/loki/api/v1/push --set config.scrape_configs[0].job_name=kubernetes-pods --set config.scrape_configs[0].kubernetes_sd_configs[0].role=pod --set config.scrape_configs[0].relabel_configs[0].source_labels[0]=__meta_kubernetes_pod_label_name --set config.scrape_configs[0].relabel_configs[0].action=keep --set config.scrape_configs[0].relabel_configs[0].regex=.* --set config.scrape_configs[0].relabel_configs[1].source_labels[0]=__meta_kubernetes_namespace --set config.scrape_configs[0].relabel_configs[1].target_label=namespace --set config.scrape_configs[0].relabel_configs[2].source_labels[0]=__meta_kubernetes_pod_name --set config.scrape_configs[0].relabel_configs[2].target_label=pod
 
 
