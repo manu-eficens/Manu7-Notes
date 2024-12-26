@@ -15,6 +15,9 @@ loki:
 promtail:
   enabled: true
 
+prometheus:
+  enabled: true
+
 grafana:
   enabled: true
   service:
