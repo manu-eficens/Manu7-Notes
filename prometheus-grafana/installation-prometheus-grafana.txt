@@ -1,5 +1,7 @@
 # grafana, promtail, loki 
 https://github.com/easydeploy-cloud/loki_promtail_grafana_kubernetes/tree/main
+# loki-stack helm repo 
+https://github.com/grafana/helm-charts/tree/main/charts/loki-stack
 
 helm repo add grafana https://grafana.github.io/helm-charts
 helm repo update
