@@ -123,8 +123,13 @@ eksctl create iamidentitymapping --cluster snoops-dev \
     --arn arn:aws:iam::654654447565:role/Snoops-eks-node-role \
     --group system:bootstrappers,system:nodes \
     --username system:node:{{EC2PrivateDNSName}}
------------------------------------------------------------------------------------------------------------------------------------------------------
-
+---------------------------------------------------------------------------------------------------------------------------------------------
+error: if suppose kubeconfig path missing 
+export KUBECONFIG=~/.kube/config
+mkdir -p ~/.kube
+chmod 700 ~/.kube
+aws eks update-kubeconfig --name test-eks --region ap-south-1
+----------
 step5: for classic load balancer & RDS
 
 01-MySQL-externalName-Service.yml
