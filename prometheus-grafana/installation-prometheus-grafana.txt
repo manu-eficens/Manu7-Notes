@@ -37,6 +37,9 @@ helm install loki grafana/loki-stack --values loki.yml -n loki-stack
 kubectl get secret --namespace default loki-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
                                           (or)
  kubectl get secret --namespace loki-stack loki-grafana -o jsonpath="{.data.admin-password}" | ForEach-Object { [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($_)) }
+
+
+dashboard 15141
 -----------------------------------------------------------------------------------------------------------------------
 # installation of prometheus and grafana 
 https://sunitabachhav2007.hashnode.dev/prometheus-and-grafana-dashboard-on-eks-cluster-using-helm-chart   (including ebs csi drivers)
