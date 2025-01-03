@@ -13,6 +13,12 @@ kubectl create ns loki-stack
 # loki.yml
 loki:
   enabled: true
+  persistence:
+    enabled: true
+    storageClassName: gp2  # Replace with your storage class if different
+    accessModes:
+      - ReadWriteOnce
+    size: 50Gi  # Set your desired storage size for Loki
 
 promtail:
   enabled: true
@@ -22,6 +28,12 @@ prometheus:
 
 grafana:
   enabled: true
+  persistence:
+    enabled: true
+    storageClassName: gp2  # Replace with your storage class if different
+    accessModes:
+      - ReadWriteOnce
+    size: 10Gi  # Set your desired storage size for Grafana
   service:
     type: LoadBalancer
     annotations:
@@ -31,6 +43,18 @@ grafana:
       alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
       alb.ingress.kubernetes.io/scheme: "internet-facing"
       alb.ingress.kubernetes.io/target-type: "ip"
+  adminUser: "admin"          # Specify the admin username
+  adminPassword: "Spark@123"  # Specify a permanent password
+
+  loki:
+    config:
+      table_manager:
+        retention_deletes_enabled: true
+        retention_period: 360h # Retain logs for 15 days
+      compactor:
+        retention_enabled: true
+        retention_period: 360h # Retain logs for 15 days
+
 
 helm install loki grafana/loki-stack --values loki.yml -n loki-stack
 
@@ -40,6 +64,10 @@ kubectl get secret --namespace default loki-grafana -o jsonpath="{.data.admin-pa
 
 
 dashboard 15141
+
+
+helm upgrade loki grafana/loki-stack --values loki.yml -n loki-stack
+
 -----------------------------------------------------------------------------------------------------------------------
 # installation of prometheus and grafana 
 https://sunitabachhav2007.hashnode.dev/prometheus-and-grafana-dashboard-on-eks-cluster-using-helm-chart   (including ebs csi drivers)
