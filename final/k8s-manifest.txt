@@ -80,10 +80,11 @@ eksctl version
 
 Step2: Create EKS Cluster using eksctl
 
-eksctl create cluster --name=test-eks \
-                      --region=us-east-1 \
-                      --zones=us-east-1a,us-east-1b \
-                      --without-nodegroup 
+eksctl create cluster --name=demo-eks \
+                      --region=ap-south-1 \
+                      --zones=ap-south-1a,ap-south-1b \
+                      --without-nodegroup \
+                      --version=1.28
 --------------------------------------------------------------------------------------------------------------------------------------------------
 Step3: Create & Associate IAM OIDC Provider for our EKS Cluster
 
@@ -93,14 +94,14 @@ Step3: Create & Associate IAM OIDC Provider for our EKS Cluster
 
 # Replace with region & cluster name
 eksctl utils associate-iam-oidc-provider \
-    --region us-east-1 \
-    --cluster test-eks \
+    --region ap-south-1 \
+    --cluster demo-eks \
     --approve
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 step4: create nodegroup in private subnets
 
-eksctl create nodegroup --cluster=test-eks \
-                        --region=us-east-1 \
+eksctl create nodegroup --cluster=demo-eks \
+                        --region=ap-south-1 \
                         --name=test-eks-private57 \
                         --node-type=t3.medium \
                         --nodes=2 \
@@ -108,7 +109,7 @@ eksctl create nodegroup --cluster=test-eks \
                         --nodes-max=4 \
                         --node-volume-size=20 \
                         --ssh-access \
-                        --ssh-public-key=autoscaling-key \
+                        --ssh-public-key=visiq \
                         --managed \
                         --asg-access \
                         --external-dns-access \
@@ -116,6 +117,9 @@ eksctl create nodegroup --cluster=test-eks \
                         --appmesh-access \
                         --alb-ingress-access \
                         --node-private-networking 
+
+eksctl utils write-kubeconfig --cluster=demo-eks --region=ap-south-1
+
 ----------------------------------------------------------------------------------------------------
 error: nodes are coming but not attached to eks cluster
 # https://docs.aws.amazon.com/eks/latest/userguide/troubleshooting.html
